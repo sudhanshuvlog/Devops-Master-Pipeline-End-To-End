@@ -25,8 +25,8 @@ pipeline {
         }
         stage("Create Infrastructure for PROD"){
             steps{
-            sh "terraform  -chdir=../deploy/terraformscripts init"
-            sh "terraform -chdir=../deploy/terraformscripts apply --auto-approve"
+            sh "terraform  -chdir=./deploy/terraformscripts init"
+            sh "terraform -chdir=./deploy/terraformscripts apply --auto-approve"
             sh "sleep 30" //giving some time for infrastructure to be up and running..
             sh "mv inventory ../deploy/"
             echo "Infrastructure is up and running.."
