@@ -5,7 +5,7 @@
   tasks:
     - name: Copy the deploment.yml file to Target Node
       copy:
-        src: deployment.yml
+        src: ../deployment.yml
         dest: deployment.yml
     - name: Check if Deployment exists
       command: "kubectl get deployment gfgdeployment"
