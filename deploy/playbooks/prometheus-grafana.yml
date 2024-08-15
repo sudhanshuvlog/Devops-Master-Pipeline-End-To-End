@@ -1,0 +1,83 @@
+---
+- name: Install Helm and Prometheus
+  hosts: all  # Run tasks on all hosts
+  become: true  # Run tasks with sudo
+
+  tasks:
+    - name: Download Helm
+      get_url:
+        url: https://get.helm.sh/helm-v3.7.1-linux-amd64.tar.gz
+        dest: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+
+    - name: Ensure destination directory exists
+      ansible.builtin.file:
+        path: /tmp/helm
+        state: directory
+
+    - name: Extract Helm
+      ansible.builtin.unarchive:
+        src: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+        dest: /tmp/helm
+        remote_src: yes
+
+    - name: Move Helm to /usr/local/bin
+      command: sudo mv /tmp/helm/linux-amd64/helm /usr/local/bin/helm
+
+    - name: Check Helm version
+      command: helm version
+
+    - name: Add Prometheus Helm repository
+      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+    - name: Update Helm repositories
+      command: helm repo update
+
+    - name: Install Prometheus using Helm
+      command: helm install prometheus prometheus-community/prometheus
+      ignore_errors: yes
+
+    - name: Expose Prometheus service using kubectl
+      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext
+      ignore_errors: yes
+
+    # - name: Get Minikube service URL for Prometheus
+    #   command: "minikube service prometheus-server-ext --url"
+    #   register: minikube_prometheus_url
+    #   ignore_errors: yes
+
+    - name: Install socat
+      ansible.builtin.package:
+        name: socat
+        state: present
+        
+    # - name: Start socat to expose Prometheus service externally
+    #   command: "sudo socat TCP4-LISTEN:9090,fork,su=nobody TCP4:{{ minikube_prometheus_url.stdout.split('://')[1] }}"
+    #   async: 10  # Set a timeout in seconds
+    #   poll: 0     # Poll indefinitely until the command completes
+
+    - name: Update Helm repositories for Grafana
+      command: helm repo update
+      ignore_errors: yes
+
+    - name: Add Help Repo for Grafana
+      command: helm repo add grafana https://grafana.github.io/helm-charts 
+      ignore_errors: yes
+
+    - name: Install Grafana using Helm
+      command: helm install grafana grafana/grafana
+      ignore_errors: yes
+
+    - name: Expose Grafana service using kubectl
+      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext
+      ignore_errors: yes
+
+    # - name: Get Minikube service URL for Grafana
+    #   command: "minikube service grafana-ext --url"
+    #   register: minikube_grafana_url
+    #   ignore_errors: yes
+
+    # - name: Start socat to expose Grafana service externally
+    #   command: "sudo socat TCP4-LISTEN:3000,fork,su=nobody TCP4:{{ minikube_grafana_url.stdout.split('://')[1] }}"
+    #   async: 10  # Set a timeout in seconds
+    #   poll: 0   
+    #   ignore_errors: yes

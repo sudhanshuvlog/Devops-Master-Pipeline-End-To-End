@@ -1,0 +1,41 @@
+---
+- name: Install Minikube and kubectl
+  hosts: all
+  become: true  # Run tasks with sudo
+
+  tasks:
+    - name: Download Minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm
+        dest: /tmp/minikube-latest.x86_64.rpm
+
+    - name: Install Minikube
+      command: rpm -Uvh /tmp/minikube-latest.x86_64.rpm
+      ignore_errors: yes
+
+    - package:
+        name: docker
+        state: present
+
+    - service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Check if Minikube is running
+      shell: minikube status | grep -q "Running"
+      register: minikube_running
+      ignore_errors: true
+
+    - name: Start Minikube
+      command: minikube start --force
+      when: minikube_running.rc != 0
+
+    - name: Download kubectl
+      get_url:
+        url: https://s3.us-west-2.amazonaws.com/amazon-eks/1.28.3/2023-11-14/bin/linux/amd64/kubectl
+        dest: /usr/bin/kubectl
+        mode: +x
+
+    - name: Check Minikube status
+      command: kubectl get pods

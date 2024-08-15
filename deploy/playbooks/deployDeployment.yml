@@ -1,0 +1,23 @@
+- name: Run Command Playbook
+  hosts: all
+  become: true  # Run tasks with sudo
+
+  tasks:
+    - name: Copy the deploment.yml file to Target Node
+      copy:
+        src: deployment.yml
+        dest: deployment.yml
+    - name: Check if Deployment exists
+      command: "kubectl get deployment gfgdeployment"
+      ignore_errors: true
+      register: deployment_check
+
+    - name: Run Deployment or Rollout
+      command: "kubectl create -f deployment.yml"
+      when: deployment_check.rc != 0  # Deployment doesn't exist
+      ignore_errors: true
+
+    - name: Rollout Deployment
+      command: "kubectl rollout restart deployment gfgdeployment"
+      when: deployment_check.rc == 0  # Deployment exists
+      ignore_errors: true

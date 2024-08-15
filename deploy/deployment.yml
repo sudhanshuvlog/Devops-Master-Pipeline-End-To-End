@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: "gfgdeployment"
+spec: 
+  replicas: 3
+  selector:
+    matchLabels:
+      dc: "In"
+  template:
+    metadata:
+      name: "mypod"
+      labels:
+        dc: "In"
+    spec:
+      containers:
+      - name: "myos"
+        image: jinny1/flaskapp:latest
+        imagePullPolicy: Always
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: "mygfgservice"
+spec:
+  selector:
+    dc: "In"
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 31933
+  type: LoadBalancer

@@ -1,0 +1,2 @@
+[prod] 
+3.110.56.37 ansible_user=ec2-user ansible_ssh_private_key_file=gfgkey 

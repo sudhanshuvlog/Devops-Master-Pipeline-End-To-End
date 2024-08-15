@@ -1,0 +1,18 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: "Install the packages for me"
+      package:
+        name: httpd
+        state: present
+
+    - name: "copy the file"
+      copy:
+        src: index.html
+        dest: /var/www/html
+
+    - name: "starting the service"
+      service:
+        name: httpd
+        state: started
+        enabled: yes
