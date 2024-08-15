@@ -40,8 +40,8 @@ pipeline {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh "chmod 400 mykey"
-                    sh "ansible-playbook rhel_common.yml"
-                    sh "ansible-playbook rhel_master.yml"
+                    sh "ansible-playbook rhel_common.yaml"
+                    sh "ansible-playbook rhel_master.yaml"
                     echo "K8s Multi cluster configured successfully!"
                 }
             }
