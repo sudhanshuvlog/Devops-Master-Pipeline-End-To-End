@@ -1,6 +1,6 @@
 ---
 - name: Install Helm and Prometheus
-  hosts: all  # Run tasks on all hosts
+  hosts: k8s-master  # Run tasks on all hosts
   become: true  # Run tasks with sudo
 
   tasks:

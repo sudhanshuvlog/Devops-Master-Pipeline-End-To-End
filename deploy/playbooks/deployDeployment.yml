@@ -1,5 +1,5 @@
 - name: Run Command Playbook
-  hosts: all
+  hosts: k8s-master
   become: true  # Run tasks with sudo
 
   tasks:
