@@ -29,7 +29,7 @@ pipeline {
             sh "terraform -chdir=./deploy/terraformscripts apply --auto-approve"
             sh "sleep 30" //giving some time for infrastructure to be up and running..
             sh "pwd"
-            sh "cp inventory ../playbooks/inventory"
+            sh "cp ./deploy/terraformscripts/inventory ./deploy/playbooks/inventory"
             echo "Infrastructure is up and running.."
             }
         }
