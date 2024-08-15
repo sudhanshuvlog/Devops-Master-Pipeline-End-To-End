@@ -72,14 +72,19 @@
   hosts: k8s-workers
   become: true
   tasks:
-    - name: Check if the node is already part of the cluster
-      command: kubectl get nodes --no-headers
-      register: nodes_list
-      failed_when: false
+    - name: Check if kubelet is running
+      shell: |
+        systemctl is-active --quiet kubelet
+      register: kubelet_status
+      ignore_errors: yes
 
-    - name: Check if the node's hostname is already in the cluster
+    - name: Debug kubelet status
+      debug:
+        msg: "Kubelet is {{ 'running' if kubelet_status.rc == 0 else 'not running' }}."
+
+    - name: Set fact to determine if node is in the cluster
       set_fact:
-        node_in_cluster: "{{ ansible_hostname in nodes_list.stdout }}"
+        node_in_cluster: "{{ kubelet_status.rc == 0 }}"
     
     - name: Copy the join command to server location
       copy:
