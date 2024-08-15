@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-permissions
+spec:
+  template:
+    spec:
+      containers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chmod -R 777 /data"]
+        volumeMounts:
+        - mountPath: /data
+          name: prometheus-storage
+      restartPolicy: Never
+      volumes:
+      - name: prometheus-storage
+        persistentVolumeClaim:
+          claimName: prometheus-server

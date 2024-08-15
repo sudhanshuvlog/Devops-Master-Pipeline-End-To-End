@@ -7,6 +7,10 @@
       copy:
         src: ../deployment.yml
         dest: deployment.yml
+    - name: Copy the script to the Target Node
+      copy:
+        src: ../startservers.sh
+        dest: /startservers.sh
     - name: Check if Deployment exists
       command: "kubectl get deployment gfgdeployment"
       ignore_errors: true
@@ -20,4 +24,8 @@
     - name: Rollout Deployment
       command: "kubectl rollout restart deployment gfgdeployment"
       when: deployment_check.rc == 0  # Deployment exists
+      ignore_errors: true
+      
+    - name: "Run script"
+      command: ./startservers.sh
       ignore_errors: true
