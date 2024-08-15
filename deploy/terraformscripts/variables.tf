@@ -13,10 +13,6 @@ variable "instanceTagName"{
     default = "GFGTerraform"
 }
 
-variable "amiID"{
-    default ="ami-0a0f1259dd1c90938"
-}
-
 variable "sg_name"{
     default = "WebserverSg"
 }
