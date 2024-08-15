@@ -36,13 +36,13 @@
         - ../prometheus-serverpv.yml
 
     - name: Make the deployments
-    command: "kubectl apply -f {{ item }}"
-    loop:
-      - permissions-pv.yml
-      - prometheus-server1pv.yml
-      - prometheus-serverpv.yml
-    args:
-      chdir: /path/to/directory 
+      command: "kubectl apply -f {{ item }}"
+      loop:
+        - permissions-pv.yml
+        - prometheus-server1pv.yml
+        - prometheus-serverpv.yml
+      args:
+        chdir: / 
 
     - name: Add Prometheus Helm repository
       command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
