@@ -32,21 +32,18 @@ pipeline {
             echo "Infrastructure is up and running.."
             }
         }
-        stage("Configure k8s cluster on the created infrastructure "){
+        stage("Configure k8s cluster on the created infrastructure") {
+            environment {
+                ANSIBLE_DIR = '../deploy' // Adjust this to the directory containing your ansible.cfg
+            }
             steps {
-                // Set environment variable for the directory containing ansible.cfg
-                environment {
-                    ANSIBLE_DIR = '../deploy' // Adjust this to the directory containing your ansible.cfg
+                dir("${ANSIBLE_DIR}") {
+                    sh "chmod 400 mykey"
+                    sh "ansible-playbook playbooks/rhel_common.yml"
+                    sh "ansible-playbook playbooks/rhel_master.yml"
+                    echo "K8s Multi cluster configured successfully!"
                 }
-
-            // Navigate to the Ansible directory and run playbooks
-            dir("${ANSIBLE_DIR}") {
-                sh "chmod 400 mykey"
-                sh "ansible-playbook playbooks/rhel_common.yml"
-                sh "ansible-playbook playbooks/rhel_master.yml"
-                echo "K8s Multi cluster configured successfully!"
-        }
-    }
+            }
         }
         stage("Configure Monitoring Tool"){
             steps{
