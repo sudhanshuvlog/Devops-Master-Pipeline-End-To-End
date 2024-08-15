@@ -28,32 +28,38 @@ pipeline {
             sh "terraform  -chdir=./deploy/terraformscripts init"
             sh "terraform -chdir=./deploy/terraformscripts apply --auto-approve"
             sh "sleep 30" //giving some time for infrastructure to be up and running..
-            sh "mv inventory ../deploy/"
+            sh "mv inventory ../playbooks/"
             echo "Infrastructure is up and running.."
             }
         }
         stage("Configure k8s cluster on the created infrastructure") {
             environment {
-                ANSIBLE_DIR = '../deploy' // Adjust this to the directory containing your ansible.cfg
+                ANSIBLE_DIR = './deploy/playbooks' // Adjust this to the directory containing your ansible.cfg
             }
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh "chmod 400 mykey"
-                    sh "ansible-playbook playbooks/rhel_common.yml"
-                    sh "ansible-playbook playbooks/rhel_master.yml"
+                    sh "ansible-playbook rhel_common.yml"
+                    sh "ansible-playbook rhel_master.yml"
                     echo "K8s Multi cluster configured successfully!"
                 }
             }
         }
         stage("Configure Monitoring Tool"){
+            environment {
+                ANSIBLE_DIR = './deploy/playbooks' // Adjust this to the directory containing your ansible.cfg
+            }
             steps{
-                sh "ansible-playbook ../deploy/playbooks/prometheus-grafana.yml"
+                sh "ansible-playbook prometheus-grafana.yml"
                 echo "Monitoring tool configured succesfully!"
             }
         }
         stage("Deploy the Webserver"){
+            environment {
+                ANSIBLE_DIR = './deploy/playbooks' // Adjust this to the directory containing your ansible.cfg
+            }
             steps{
-                sh "ansible-playbook ../deploy/playbooks/deployDeployment.yml"
+                sh "ansible-playbook deployDeployment.yml"
                 sh "chmod +x startservers.sh"
                 echo "Create a Socat to connect to our webserver from the Internet(from the outside of ec2 Instance)"
                 sh "./startservers.sh"

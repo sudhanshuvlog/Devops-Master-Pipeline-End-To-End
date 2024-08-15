@@ -7,7 +7,7 @@ resource "aws_instance" "web" {
   }
   key_name = aws_key_pair.my_key_pair.key_name
   vpc_security_group_ids = [aws_security_group.webserver_sg.id]
-
+  count =2
   provisioner "local-exec" {
     command = "echo 'resource exectued succesfully'"
   }
