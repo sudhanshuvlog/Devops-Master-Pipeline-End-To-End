@@ -20,8 +20,8 @@
         dest: /tmp/helm
         remote_src: yes
 
-    - name: Move Helm to /usr/local/bin
-      command: sudo mv /tmp/helm/linux-amd64/helm /usr/local/bin/helm
+    - name: Move Helm to /bin
+      command: sudo mv /tmp/helm/linux-amd64/helm /bin/helm
 
     - name: Check Helm version
       command: helm version
