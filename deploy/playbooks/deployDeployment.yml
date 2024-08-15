@@ -10,7 +10,7 @@
     - name: Copy the script to the Target Node
       copy:
         src: ../startservers.sh
-        dest: /startservers.sh
+        dest: startservers.sh
     - name: Check if Deployment exists
       command: "kubectl get deployment gfgdeployment"
       ignore_errors: true
@@ -27,5 +27,5 @@
       ignore_errors: true
       
     - name: "Run script"
-      command: ./startservers.sh
+      command: bash startservers.sh
       ignore_errors: true
