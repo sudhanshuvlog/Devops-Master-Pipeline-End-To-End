@@ -29,7 +29,7 @@ spec:
   selector:
     dc: "In"
   ports:
-  - port: 80
-    targetPort: 80
+  - port: 5000
+    targetPort: 5000
     nodePort: 31933
   type: LoadBalancer
