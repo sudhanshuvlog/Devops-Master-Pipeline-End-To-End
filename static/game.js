@@ -69,10 +69,14 @@ function update() {
 function generateRandomPos() {
     let pos;
     do {
-        pos = { x: Math.floor(Math.random() * numberOfCells), y: Math.floor(Math.random() * numberOfCells) };
+        pos = { 
+            x: Math.floor(Math.random() * (numberOfCells - 1)), 
+            y: Math.floor(Math.random() * (numberOfCells - 1)) 
+        };
     } while (snake.some(segment => segment.x === pos.x && segment.y === pos.y));
     return pos;
 }
+
 
 document.addEventListener('keydown', (e) => {
     switch (e.key) {

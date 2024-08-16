@@ -55,7 +55,7 @@
       ignore_errors: yes
 
     - name: Expose Prometheus service using kubectl
-      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext
+      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090 --node-port=31931
       ignore_errors: yes
 
     # - name: Get Minikube service URL for Prometheus
@@ -86,16 +86,5 @@
       ignore_errors: yes
 
     - name: Expose Grafana service using kubectl
-      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext
+      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=9090 --node-port=31932
       ignore_errors: yes
-
-    # - name: Get Minikube service URL for Grafana
-    #   command: "minikube service grafana-ext --url"
-    #   register: minikube_grafana_url
-    #   ignore_errors: yes
-
-    # - name: Start socat to expose Grafana service externally
-    #   command: "sudo socat TCP4-LISTEN:3000,fork,su=nobody TCP4:{{ minikube_grafana_url.stdout.split('://')[1] }}"
-    #   async: 10  # Set a timeout in seconds
-    #   poll: 0   
-    #   ignore_errors: yes

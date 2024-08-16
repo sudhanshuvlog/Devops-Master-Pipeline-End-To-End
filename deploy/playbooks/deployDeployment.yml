@@ -27,5 +27,5 @@
       ignore_errors: true
       
     - name: "Run script"
-      command: bash startservers.sh &
+      command:  nohup bash startservers.sh > /dev/null 2>&1 &
       ignore_errors: true
