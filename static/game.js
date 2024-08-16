@@ -70,8 +70,8 @@ function generateRandomPos() {
     let pos;
     do {
         pos = { 
-            x: Math.floor(Math.random() * (numberOfCells - 1)), 
-            y: Math.floor(Math.random() * (numberOfCells - 1)) 
+            x: Math.floor(Math.random() * (numberOfCells - 4)), 
+            y: Math.floor(Math.random() * (numberOfCells - 4)) 
         };
     } while (snake.some(segment => segment.x === pos.x && segment.y === pos.y));
     return pos;
