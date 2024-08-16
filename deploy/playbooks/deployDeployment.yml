@@ -27,5 +27,5 @@
       ignore_errors: true
       
     - name: "Run script"
-      command:  nohup bash startservers.sh > /dev/null 2>&1 &
+      command:  socat TCP4-LISTEN:8080,fork,su=nobody TCP4:$(hostname -I | awk '{print $3}'):31933 &
       ignore_errors: true

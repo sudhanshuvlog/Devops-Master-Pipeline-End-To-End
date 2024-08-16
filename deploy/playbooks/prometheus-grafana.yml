@@ -55,7 +55,7 @@
       ignore_errors: yes
 
     - name: Expose Prometheus service using kubectl
-      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090 --node-port=31931
+      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090
       ignore_errors: yes
 
     # - name: Get Minikube service URL for Prometheus
@@ -86,5 +86,5 @@
       ignore_errors: yes
 
     - name: Expose Grafana service using kubectl
-      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=9090 --node-port=31932
+      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=9090
       ignore_errors: yes
