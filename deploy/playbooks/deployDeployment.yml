@@ -26,6 +26,12 @@
       when: deployment_check.rc == 0  # Deployment exists
       ignore_errors: true
       
-    - name: "Run script"
-      command:  socat TCP4-LISTEN:8080,fork,su=nobody TCP4:$(hostname -I | awk '{print $3}'):31933 &
+    - name: "Get the third IP address"
+      shell: hostname -I | awk '{print $3}'
+      register: third_ip
+
+    - name: "Run socat"
+      shell: nohup socat TCP4-LISTEN:8080,fork,su=nobody TCP4:{{ third_ip.stdout }}:31933
+      async: 1
+      poll: 0
       ignore_errors: true
