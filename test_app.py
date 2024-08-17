@@ -10,7 +10,7 @@ class FlaskAppTests(unittest.TestCase):
     def test_index_page(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Retro Snake', response.data)
+        self.assertIn(b'GFG Snake Game', response.data)
     
     def test_static_files(self):
         response = self.client.get('/static/game.js')
