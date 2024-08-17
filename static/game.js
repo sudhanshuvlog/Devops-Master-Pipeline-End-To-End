@@ -1,9 +1,11 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const cellSize = 30;
-const numberOfCells = 25;
-const OFFSET = 75;
+const canvasWidth = 500;
+const canvasHeight = 500;
+const numberOfCells = 25; // Number of cells on the canvas
+const cellSize = Math.floor(canvasWidth / numberOfCells); // Calculate cell size
+const OFFSET = 0; // You can adjust this as needed
 
 const GREEN = 'rgb(173, 204, 96)';
 const DARK_GREEN = 'rgb(43, 51, 24)';
@@ -20,7 +22,7 @@ const wallHitSound = new Audio('wall.mp3');
 
 function draw() {
     ctx.fillStyle = GREEN;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     ctx.fillStyle = DARK_GREEN;
     snake.forEach(segment => {
@@ -70,13 +72,12 @@ function generateRandomPos() {
     let pos;
     do {
         pos = { 
-            x: Math.floor(Math.random() * (numberOfCells - 4)), 
-            y: Math.floor(Math.random() * (numberOfCells - 4)) 
+            x: Math.floor(Math.random() * numberOfCells), 
+            y: Math.floor(Math.random() * numberOfCells) 
         };
     } while (snake.some(segment => segment.x === pos.x && segment.y === pos.y));
     return pos;
 }
-
 
 document.addEventListener('keydown', (e) => {
     switch (e.key) {

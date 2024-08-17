@@ -30,8 +30,8 @@
       shell: hostname -I | awk '{print $3}'
       register: third_ip
 
-    - name: "Run socat"
-      shell: nohup socat TCP4-LISTEN:8080,fork,su=nobody TCP4:{{ third_ip.stdout }}:31933
-      async: 1
-      poll: 0
-      ignore_errors: true
+    # - name: "Run socat"
+    #   shell: nohup socat TCP4-LISTEN:8080,fork,su=nobody TCP4:{{ third_ip.stdout }}:31933
+    #   async: 1
+    #   poll: 0
+    #   ignore_errors: true

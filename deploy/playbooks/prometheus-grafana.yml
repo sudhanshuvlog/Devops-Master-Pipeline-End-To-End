@@ -58,20 +58,10 @@
       command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090
       ignore_errors: yes
 
-    # - name: Get Minikube service URL for Prometheus
-    #   command: "minikube service prometheus-server-ext --url"
-    #   register: minikube_prometheus_url
-    #   ignore_errors: yes
-
     - name: Install socat
       ansible.builtin.package:
         name: socat
         state: present
-        
-    # - name: Start socat to expose Prometheus service externally
-    #   command: "sudo socat TCP4-LISTEN:9090,fork,su=nobody TCP4:{{ minikube_prometheus_url.stdout.split('://')[1] }}"
-    #   async: 10  # Set a timeout in seconds
-    #   poll: 0     # Poll indefinitely until the command completes
 
     - name: Update Helm repositories for Grafana
       command: helm repo update
