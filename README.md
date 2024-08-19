@@ -2,6 +2,9 @@
 
 This repository contains an advanced end-to-end DevOps project that integrates various tools such as Git, Docker, Kubernetes, Helm, GitHub Actions, Jenkins, Terraform, Ansible, Prometheus, Grafana, AWS, and Shell scripts. The project sets up a continuous integration and deployment pipeline.
 
+- We are going to deploy below game app on the K8s cluster.
+![Snake Game Webapp](Screenshots/webapp.png)
+
 ## Project Overview
 
 ### Step 1: Fork and Customize Repository
@@ -46,7 +49,7 @@ This repository contains an advanced end-to-end DevOps project that integrates v
 - Setup Ansible
 - Setup Terraform
 - Create Infrastructure for PROD
-- Configure k8s cluster on the created infrastructure
+- Configure multi node k8s cluster on the created infrastructure
 - Configure Monitoring Tool
 - Deploy the Webserver
 - ![Jenkins Pipeline Stage View](Screenshots/JenkinsPipelineView.png)
