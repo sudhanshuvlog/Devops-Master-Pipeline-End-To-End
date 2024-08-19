@@ -7,31 +7,38 @@
       register: kubectl_status
       ignore_errors: yes
 
-    - name: Define the Master Node Private IP on the shell
-      shell:
-        cmd: MASTER_PRIVATE_IP=$(ip addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1)
+    - name: Define the Master Node Private IP
+      shell: ip addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
+      register: master_private_ip
       when: kubectl_status.failed
 
-    - name: Define the POD_CIDR variable in the shell
-      shell:
-        cmd: POD_CIDR="192.168.0.0/16"
+    - name: Define the POD_CIDR variable
+      set_fact:
+        pod_cidr: "192.168.0.0/16"
       when: kubectl_status.failed
 
     - name: Define the Master Node name in short
-      shell:
-        cmd: NODENAME=$(hostname -s)
+      shell: hostname -s
+      register: nodename
       when: kubectl_status.failed
 
     - name: Initialize the Kubernetes Cluster
-      shell:
-        cmd: kubeadm init --apiserver-advertise-address="$MASTER_PRIVATE_IP" --apiserver-cert-extra-sans="$MASTER_PRIVATE_IP" --pod-network-cidr="$POD_CIDR" --node-name="$NODENAME" --ignore-preflight-errors Swap
+      shell: |
+        kubeadm init --apiserver-advertise-address="{{ master_private_ip.stdout }}" \
+        --apiserver-cert-extra-sans="{{ master_private_ip.stdout }}" \
+        --pod-network-cidr="{{ pod_cidr }}" \
+        --node-name="{{ nodename.stdout }}" \
+        --ignore-preflight-errors Swap
       register: kubeinit_details
       when: kubectl_status.failed
 
-    - name: Output of the Kubeadm init command
+    - name: Display Kubeadm init output
       debug:
         var: kubeinit_details
       when: kubectl_status.failed
+
+    # Further tasks...
+
 
     - name: Create .kube directory if it doesn't exist
       file:
