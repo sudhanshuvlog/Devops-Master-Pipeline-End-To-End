@@ -52,7 +52,7 @@ This repository contains an advanced end-to-end DevOps project that integrates v
 - Configure multi node k8s cluster on the created infrastructure
 - Configure Monitoring Tool
 - Deploy the Webserver
-- ![Jenkins Pipeline Stage View](Screenshots/JenkinsPipelineView.png)
+- ![Jenkins Pipeline Stage View](Screenshots/jenkinspipeline.png)
 
 ### Step 11: Access the Deployed Webserver
 - Visit http://<your-Prodserver-ip>:8080 to see the deployed webserver.
