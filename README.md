@@ -5,6 +5,8 @@ This repository contains an advanced end-to-end DevOps project that integrates v
 - We are going to deploy below game app on the K8s cluster.
 ![Snake Game Webapp](Screenshots/webapp.png)
 
+My recorded session for this project is uploaded on GeeksForGeeks - https://www.geeksforgeeks.org/batch/devops-22?tab=Live
+
 ## Project Overview
 
 ### Step 1: Fork and Customize Repository
@@ -79,3 +81,23 @@ Get the Grafana dashboard at port no 3000 on your server
 
 Connect with me on LinkedIn in any kind of challenges - [Linkedin](https://www.linkedin.com/in/sudhanshu--pandey/)
 
+
+# Action Required: Update CRI-O Installation URL
+
+- Issue:
+
+The CRI-O RPM file URL in the deploy/playbooks/rhel_common.yaml file on line 55 is subject to frequent changes. The current command used for installation is:
+
+`yum install https://download.opensuse.org/repositories/isv:/kubernetes:/addons:/cri-o:/prerelease:/v1.29:/build/rpm/x86_64/cri-o-1.29.7~dev-150500.16.1.x86_64.rpm -y`
+
+- Required Action:
+
+1) Immediate Update:
+
+Update the URL to the latest version. You can find the updated URL from the CRI-O artifacts here.
+`https://download.opensuse.org/repositories/isv:/kubernetes:/addons:/cri-o:/prerelease:/v1.29:/build/rpm/x86_64/`
+
+2) Long-term Solution:
+
+Instead of manually updating the URL every time, consider configuring a yum repository for CRI-O. This will allow the playbook to pull the latest version automatically, reducing the need for manual intervention.
+This approach will streamline the process and ensure that the playbook remains up-to-date with the latest CRI-O version.
