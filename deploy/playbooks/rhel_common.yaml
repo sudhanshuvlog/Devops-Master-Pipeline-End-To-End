@@ -51,7 +51,9 @@
         dest: "/etc/yum.repos.d/{{ item.repo_name }}"
       loop:
         - { content: "[kubernetes]\nname=Kubernetes\nbaseurl=https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/rpm/\nenabled=1\ngpgcheck=1\ngpgkey=https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/rpm/repodata/repomd.xml.key", repo_name: "kubernetes.repo" }
-
+    - copy:
+        src: cri-o-1.29.9~dev-150500.2.1.x86_64.rpm
+        dest: cri-o-1.29.9~dev-150500.2.1.x86_64.rpm
     - command: yum install cri-o-1.29.9~dev-150500.2.1.x86_64.rpm  -y
     - name: Install Kubernetes packages
       dnf:
