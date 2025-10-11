@@ -80,8 +80,8 @@
     copy: src=join-command dest=/tmp/join-command.sh mode=0777
 
   - name: Set fact to determine if node is in the cluster
-      set_fact:
-        node_in_cluster: "{{ kubelet_status.rc == 0 }}"
+    set_fact:
+      node_in_cluster: "{{ kubelet_status.rc == 0 }}"
 
   - name: Join the node to cluster
     command: sh /tmp/join-command.sh
