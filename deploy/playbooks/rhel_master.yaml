@@ -1,3 +1,88 @@
+---
+- name: Kubernetes Master Node Configuration
+  hosts: k8s-master
+  become: true
+
+  tasks:
+    - name: Ensure /root/.kube directory exists
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Check for existing admin.conf
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: adminconf
+
+    - name: Copy admin.conf to kube config for kubectl use (if exists)
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0644'
+        owner: root
+        group: root
+      when: adminconf.stat.exists
+
+    - name: Check if Kubernetes is already initialized
+      command: kubectl cluster-info
+      register: kubectl_status
+      ignore_errors: true
+
+    - name: Set cluster_initialized fact
+      set_fact:
+        cluster_initialized: "{{ kubectl_status.rc == 0 }}"
+
+    - name: Initialize the Kubernetes Cluster (if not initialized)
+      command: >-
+        kubeadm init
+        --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+        --pod-network-cidr=192.168.0.0/16
+        --ignore-preflight-errors=Swap
+      register: kubeinit
+      when: not cluster_initialized
+
+    - name: Copy admin.conf to /root/.kube/config after init
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0644'
+      when: not cluster_initialized
+
+    - name: Wait for API server to be ready
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 6443
+        timeout: 300
+      when: not cluster_initialized
+
+    - name: Apply Calico CNI
+      command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/calico.yaml
+      register: calico_apply
+      failed_when: calico_apply.rc != 0 and calico_apply.rc != 1
+
+    - name: Generate join command on master (non-expiring token)
+      command: kubeadm token create --print-join-command --ttl 0
+      register: join_command
+      when: not cluster_initialized or join_command is not defined
+
+    - name: Save join command on master
+      copy:
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/join-command.sh
+        mode: '0700'
+
+    - name: Transfer join command to Ansible controller
+      fetch:
+        src: /tmp/join-command.sh
+        dest: "{{ playbook_dir }}/join-command.sh"
+        flat: yes
+
+
 - name: Kubernetes Worker Node Configuration
   hosts: k8s-workers
   become: true
@@ -27,18 +112,8 @@
     - name: Join worker to cluster
       command: sh /tmp/join-command.sh
       register: join_output
-      ignore_errors: true
+      ignore_errors: no
 
-    - name: Handle join result
-      block:
-        - name: Show join output
-          debug:
-            msg: "{{ join_output.stdout }}"
-
-        - name: Fail if join failed for other reasons
-          fail:
-            msg: "Worker node failed to join the cluster! Error: {{ join_output.stderr }}"
-          when:
-            - join_output.rc != 0
-            - "'already exists in the cluster' not in join_output.stderr"
-      when: join_output is defined
+    - name: Show join output
+      debug:
+        msg: "{{ join_output.stdout }}"

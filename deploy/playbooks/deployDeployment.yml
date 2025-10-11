@@ -1,26 +1,69 @@
-- name: Deploy application using k8s module (idempotent)
+---
+- name: Deploy or update GFG application
   hosts: k8s-master
   become: true
 
   vars:
     app_name: gfgdeployment
     namespace: default
+    manifest_file: /tmp/deployment.yaml
 
   tasks:
-    - name: Ensure deployment manifest is present from template
-      template:
-        src: templates/gfg-deployment.yml.j2
-        dest: /tmp/gfg-deployment.yml
 
-    - name: Apply the Kubernetes manifest (create/update)
-      k8s:
-        state: present
-        src: /tmp/gfg-deployment.yml
+    # 1️⃣ Copy deployment.yaml and startservers.sh from your repo
+    - name: Copy Kubernetes deployment manifest
+      copy:
+        src: ../deployment.yaml
+        dest: "{{ manifest_file }}"
+        remote_src: no
 
-    - name: Restart deployment if image changed (trigger rollout)
-      k8s:
-        kind: Deployment
-        namespace: "{{ namespace }}"
-        name: "{{ app_name }}"
-        state: restarted
-      when: false
+    - name: Copy startservers.sh script
+      copy:
+        src: ../startservers.sh
+        dest: /tmp/startservers.sh
+        mode: '0755'
+        remote_src: no
+
+    # 2️⃣ Check if the deployment already exists
+    - name: Check if deployment exists
+      command: "kubectl get deployment {{ app_name }} -n {{ namespace }}"
+      register: deployment_check
+      ignore_errors: true
+
+    # 3️⃣ Create the deployment if not exists
+    - name: Create deployment and service if not present
+      command: "kubectl create -f {{ manifest_file }}"
+      when: deployment_check.rc != 0
+      register: create_result
+      ignore_errors: true
+
+    # 4️⃣ Restart rollout if exists
+    - name: Rollout restart deployment if already exists
+      command: "kubectl rollout restart deployment {{ app_name }} -n {{ namespace }}"
+      when: deployment_check.rc == 0
+      register: rollout_result
+      ignore_errors: true
+
+    # 5️⃣ Fallback check to ensure service exists
+    - name: Ensure service is created or updated
+      command: "kubectl apply -f {{ manifest_file }}"
+      register: service_apply
+      ignore_errors: true
+
+    # 6️⃣ Verify resources after apply
+    - name: Get deployment and service status
+      command: "kubectl get deploy,svc -n {{ namespace }}"
+      register: k8s_status
+
+    - name: Show deployment and service status
+      debug:
+        msg: "{{ k8s_status.stdout_lines }}"
+
+    # 7️⃣ Print pods status for debugging
+    - name: Show running pods
+      command: "kubectl get pods -o wide -n {{ namespace }}"
+      register: pods_output
+
+    - name: Print pod status
+      debug:
+        msg: "{{ pods_output.stdout_lines }}"
