@@ -9,9 +9,8 @@
     - git
   tasks:
     - name: Disable swap
-      ansible.builtin.shell: swapoff -a
-      args:
-        warn: false
+      ansible.builtin.command:
+        cmd: swapoff -a
 
     - name: Ensure swapoff at reboot (crontab)
       ansible.builtin.cron:
