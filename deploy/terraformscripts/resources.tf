@@ -1,50 +1,43 @@
 resource "aws_instance" "web" {
   depends_on = [aws_key_pair.my_key_pair, aws_security_group.webserver_sg]
-  ami = data.aws_ami.latest_amazon_linux.id
+  ami           = data.aws_ami.latest_amazon_linux.id
   instance_type = var.instanceType
+  key_name      = aws_key_pair.my_key_pair.key_name
+  vpc_security_group_ids = [aws_security_group.webserver_sg.id]
+  count = var.instance_count
+
   tags = {
-    Name = "${var.instanceTagName}"
+    Name = "${var.instanceTagName}-${count.index}"
   }
-  key_name = aws_key_pair.my_key_pair.key_name
-  vpc_security_group_ids = ["sg-0fc30dede114a834f"]
-  count = 2
+
   provisioner "local-exec" {
-    command = "echo 'resource executed successfully'"
+    command = "echo 'instance ${self.id} created'"
   }
 }
 
 resource "aws_key_pair" "my_key_pair" {
-  key_name   = "testkeygfg1"
-  public_key = file("./mykey.pub")
+  key_name   = var.key_name
+  public_key = file(var.public_key_path)
 }
 
 resource "aws_security_group" "webserver_sg" {
   name        = var.sg_name
-  description = "Webserver Security Group Allow port 80"
+  description = "Webserver Security Group for Kubernetes nodes"
   vpc_id      = data.aws_vpcs.default_vpc.ids[0]
 
+  # Allow explicit ports only (keeps SSH + k8s ports + nodeport range)
   dynamic "ingress" {
-    for_each = var.allowedPort
+    for_each = toset(var.allowedPort)
     content {
-      description = "---"
+      description = "managed"
       from_port   = ingress.value
       to_port     = ingress.value
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     }
   }
-  ingress {
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+
+  # NodePort range already included in allowedPort; egress is open by default
   egress {
     from_port   = 0
     to_port     = 0
@@ -54,20 +47,26 @@ resource "aws_security_group" "webserver_sg" {
 }
 
 resource "null_resource" "configureAnsibleInventory" {
+  # Re-run on changes to instance list
   triggers = {
-    mytrigger = timestamp()
+    ips = join(",", aws_instance.web[*].public_ip)
   }
+
   provisioner "local-exec" {
     command = <<-EOT
-      echo "[k8s-master]" > inventory
-      echo "${aws_instance.web.0.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=mykey" >> inventory
-      echo "[k8s-workers]" >> inventory
+      cat > inventory <<INV
+      [k8s-master]
+      ${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/mykey
+
+      [k8s-workers]
+      INV
       for ip in ${join(" ", aws_instance.web[*].public_ip)}; do
-        if [ "$ip" != "${aws_instance.web.0.public_ip}" ]; then
-          echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=mykey" >> inventory
+        if [ "$ip" != "${aws_instance.web[0].public_ip}" ]; then
+          echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/mykey" >> inventory
         fi
       done
     EOT
+    interpreter = ["/bin/bash", "-c"]
   }
 }
 

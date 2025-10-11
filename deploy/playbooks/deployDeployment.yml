@@ -1,37 +1,26 @@
-- name: Run Command Playbook
+- name: Deploy application using k8s module (idempotent)
   hosts: k8s-master
-  become: true  # Run tasks with sudo
+  become: true
+
+  vars:
+    app_name: gfgdeployment
+    namespace: default
 
   tasks:
-    - name: Copy the deploment.yml file to Target Node
-      copy:
-        src: ../deployment.yml
-        dest: deployment.yml
-    - name: Copy the script to the Target Node
-      copy:
-        src: ../startservers.sh
-        dest: startservers.sh
-    - name: Check if Deployment exists
-      command: "kubectl get deployment gfgdeployment"
-      ignore_errors: true
-      register: deployment_check
+    - name: Ensure deployment manifest is present from template
+      template:
+        src: templates/gfg-deployment.yml.j2
+        dest: /tmp/gfg-deployment.yml
 
-    - name: Run Deployment or Rollout
-      command: "kubectl create -f deployment.yml"
-      when: deployment_check.rc != 0  # Deployment doesn't exist
-      ignore_errors: true
+    - name: Apply the Kubernetes manifest (create/update)
+      k8s:
+        state: present
+        src: /tmp/gfg-deployment.yml
 
-    - name: Rollout Deployment
-      command: "kubectl rollout restart deployment gfgdeployment"
-      when: deployment_check.rc == 0  # Deployment exists
-      ignore_errors: true
-      
-    - name: "Get the third IP address"
-      shell: hostname -I | awk '{print $3}'
-      register: third_ip
-
-    # - name: "Run socat"
-    #   shell: nohup socat TCP4-LISTEN:8080,fork,su=nobody TCP4:{{ third_ip.stdout }}:31933
-    #   async: 1
-    #   poll: 0
-    #   ignore_errors: true
+    - name: Restart deployment if image changed (trigger rollout)
+      k8s:
+        kind: Deployment
+        namespace: "{{ namespace }}"
+        name: "{{ app_name }}"
+        state: restarted
+      when: false

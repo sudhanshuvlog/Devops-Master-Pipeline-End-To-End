@@ -7,46 +7,43 @@
       register: kubectl_status
       ignore_errors: yes
 
-    - name: Define the Master Node Private IP
-      shell: ip addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
+    - name: Get master private IP
+      command: ip addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
       register: master_private_ip
       when: kubectl_status.failed
 
-    - name: Define the POD_CIDR variable
+    - name: Set pod cidr fact
       set_fact:
         pod_cidr: "192.168.0.0/16"
       when: kubectl_status.failed
 
-    - name: Define the Master Node name in short
-      shell: hostname -s
+    - name: Get short hostname
+      command: hostname -s
       register: nodename
       when: kubectl_status.failed
 
-    - name: Initialize the Kubernetes Cluster
-      shell: |
-        kubeadm init --apiserver-advertise-address="{{ master_private_ip.stdout }}" \
-        --apiserver-cert-extra-sans="{{ master_private_ip.stdout }}" \
-        --pod-network-cidr="192.168.0.0/16" \
-        --node-name="{{ nodename.stdout }}" \
-        --ignore-preflight-errors Swap
+    - name: Initialize Kubernetes master (kubeadm)
+      command: >-
+        kubeadm init --apiserver-advertise-address="{{ master_private_ip.stdout }}"
+        --apiserver-cert-extra-sans="{{ master_private_ip.stdout }}"
+        --pod-network-cidr="{{ pod_cidr }}"
+        --node-name="{{ nodename.stdout }}" --ignore-preflight-errors Swap
       register: kubeinit_details
       when: kubectl_status.failed
 
-    - name: Display Kubeadm init output
+    - name: Debug kubeadm init output
       debug:
         var: kubeinit_details
       when: kubectl_status.failed
 
-    # Further tasks...
-
-
-    - name: Create .kube directory if it doesn't exist
+    - name: Ensure .kube directory exists for user
       file:
         path: "{{ ansible_env.HOME }}/.kube"
         state: directory
+        mode: '0755'
       when: kubectl_status.failed
 
-    - name: Copy admin.conf to user's .kube directory
+    - name: Copy admin.conf to user's kube config
       copy:
         src: /etc/kubernetes/admin.conf
         dest: "{{ ansible_env.HOME }}/.kube/config"
@@ -54,25 +51,29 @@
         mode: '0644'
       when: kubectl_status.failed
 
-    - name: Change ownership of .kube/config to the user
+    - name: Ensure kube config ownership
       file:
         path: "{{ ansible_env.HOME }}/.kube/config"
         owner: "{{ ansible_user_id }}"
         group: "{{ ansible_user_gid }}"
       when: kubectl_status.failed
 
-    - name: Configure the CNI using Calico
-      shell:
-        cmd: kubectl apply -f https://raw.githubusercontent.com/sudhanshuvlog/kubernetes-multinode-cluster-ansible-aws/main/calico.yaml
+    - name: Apply Calico CNI via k8s module
+      k8s:
+        state: present
+        src: https://raw.githubusercontent.com/sudhanshuvlog/kubernetes-multinode-cluster-ansible-aws/main/calico.yaml
       when: kubectl_status.failed
 
-    - name: Generate join command
+    - name: Create kubeadm join command and save to /tmp/join-command.sh
       command: kubeadm token create --print-join-command
       register: join_command
       when: kubectl_status.failed
 
-    - name: Copy join command to local file
-      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+    - name: Save join command to file on master
+      copy:
+        content: "{{ join_command.stdout_lines[0] }}"
+        dest: /tmp/join-command.sh
+        mode: '0700'
       when: kubectl_status.failed
 
 - name: In the worker Node

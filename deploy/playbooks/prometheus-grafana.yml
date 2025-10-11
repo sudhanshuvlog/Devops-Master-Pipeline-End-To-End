@@ -4,77 +4,95 @@
   become: true  # Run tasks with sudo
 
   tasks:
-    - name: Download Helm
-      get_url:
-        url: https://get.helm.sh/helm-v3.7.1-linux-amd64.tar.gz
-        dest: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+    - name: Ensure community.kubernetes collection is installed (best-effort)
+      ansible.builtin.command: ansible-galaxy collection install community.kubernetes
+      changed_when: false
+      failed_when: false
 
-    - name: Ensure destination directory exists
-      ansible.builtin.file:
-        path: /tmp/helm
-        state: directory
-
-    - name: Extract Helm
-      ansible.builtin.unarchive:
-        src: /tmp/helm-v3.7.1-linux-amd64.tar.gz
-        dest: /tmp/helm
-        remote_src: yes
-
-    - name: Move Helm to /bin
-      command: sudo mv /tmp/helm/linux-amd64/helm /bin/helm
-
-    - name: Check Helm version
-      command: helm version
-    
-    - name: Copy the k8s pv files to Target Node
-      copy:
-        src: "{{ item }}"
-        dest: "/{{ item | basename }}"
-      loop:
-        - ../permissions-pv.yml
-        - ../prometheus-server1pv.yml
-        - ../prometheus-serverpv.yml
-
-    - name: Make the deployments
-      command: "kubectl apply -f {{ item }}"
-      loop:
-        - permissions-pv.yml
-        - prometheus-server1pv.yml
-        - prometheus-serverpv.yml
-      args:
-        chdir: / 
-
-    - name: Add Prometheus Helm repository
-      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-
-    - name: Update Helm repositories
-      command: helm repo update
-
-    - name: Install Prometheus using Helm
-      command: helm install prometheus prometheus-community/prometheus
-      ignore_errors: yes
-
-    - name: Expose Prometheus service using kubectl
-      command: kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090
-      ignore_errors: yes
-
-    - name: Install socat
+    - name: Ensure socat is installed
       ansible.builtin.package:
         name: socat
         state: present
 
-    - name: Update Helm repositories for Grafana
-      command: helm repo update
-      ignore_errors: yes
+    - name: Apply PV manifests (if present)
+      k8s:
+        state: present
+        src: "{{ item }}"
+      loop:
+        - ../permissions-pv.yml
+        - ../prometheus-server1pv.yml
+        - ../prometheus-serverpv.yml
+      register: pv_apply
+      ignore_errors: true
 
-    - name: Add Help Repo for Grafana
-      command: helm repo add grafana https://grafana.github.io/helm-charts 
-      ignore_errors: yes
+    - name: Add prometheus-community helm repo using shell fallback
+      ansible.builtin.command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      register: helm_add_prom
+      failed_when: false
+
+    - name: Update helm repos (fallback)
+      ansible.builtin.command: helm repo update
+      failed_when: false
+
+    - name: Install Prometheus using Helm (community.kubernetes.helm)
+      community.kubernetes.helm:
+        name: prometheus
+        chart_ref: prometheus-community/prometheus
+        release_namespace: monitoring
+        create_namespace: yes
+        wait: yes
+        timeout: 600
+      register: prometheus_release
+      failed_when: prometheus_release is failed
+
+    - name: Ensure prometheus service is present and exposed (NodePort)
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: prometheus-server-ext
+            namespace: monitoring
+          spec:
+            selector:
+              app: prometheus
+            type: NodePort
+            ports:
+              - port: 9090
+                targetPort: 9090
+      register: prometheus_svc
+      failed_when: false
+
+    - name: Add grafana helm repo (fallback)
+      ansible.builtin.command: helm repo add grafana https://grafana.github.io/helm-charts
+      failed_when: false
 
     - name: Install Grafana using Helm
-      command: helm install grafana grafana/grafana
-      ignore_errors: yes
+      community.kubernetes.helm:
+        name: grafana
+        chart_ref: grafana/grafana
+        release_namespace: monitoring
+        create_namespace: yes
+        wait: yes
+        timeout: 600
+      register: grafana_release
+      failed_when: grafana_release is failed
 
-    - name: Expose Grafana service using kubectl
-      command: kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=9090
-      ignore_errors: yes
+    - name: Ensure grafana service exposed (NodePort)
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: grafana-ext
+            namespace: monitoring
+          spec:
+            selector:
+              app.kubernetes.io/name: grafana
+            type: NodePort
+            ports:
+              - port: 3000
+                targetPort: 3000
+      failed_when: false
