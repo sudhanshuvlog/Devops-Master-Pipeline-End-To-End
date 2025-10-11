@@ -2,55 +2,120 @@
   hosts: k8s-master
   become: true
   tasks:
-  - name: Check if Kubernetes is already initialized (using kubectl)
-    command: kubectl --kubeconfig={{ ansible_env.HOME }}/.kube/config cluster-info
+  - name: Ensure /root/.kube directory exists
+    file:
+      path: /root/.kube
+      state: directory
+      mode: '0755'
+      owner: root
+      group: root
+
+  - name: Check for existing admin.conf
+    stat:
+      path: /etc/kubernetes/admin.conf
+    register: adminconf
+
+  - name: If admin.conf exists, copy it to /root/.kube/config for kubectl use
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: /root/.kube/config
+      remote_src: yes
+      mode: '0644'
+      owner: root
+      group: root
+    when: adminconf.stat.exists
+
+  - name: Stat for /root/.kube/config
+    stat:
+      path: /root/.kube/config
+    register: kubeconfig_stat
+
+  - name: Check if Kubernetes is already initialized (using kubectl) if kubeconfig exists
+    command: kubectl --kubeconfig=/root/.kube/config cluster-info
     register: kubectl_status
+    when: kubeconfig_stat.stat.exists
     ignore_errors: true
 
-  - name: Gather master private IP
-    ansible.builtin.command: ip -4 addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
-    register: master_private_ip
-    when: kubectl_status.rc != 0
+  - name: Normalize kubectl_status so subsequent when checks work
+    set_fact:
+      cluster_initialized: "{{ (kubectl_status.rc | default(1)) == 0 }}"
+
+  - name: Get all IPv4 addresses
+    shell: ip -4 addr show | grep inet | awk '{print $2}' | cut -d/ -f1
+    register: all_ips
+    when: not cluster_initialized
+
+  - name: Debug - Show all available IPs
+    debug:
+      msg: "Available IPs on master: {{ all_ips.stdout_lines }}"
+    when: not cluster_initialized
+
+  - name: Get default route interface IP
+    shell: ip route get 1 | awk '{print $(NF-2);exit}'
+    register: default_route_ip
+    when: not cluster_initialized
+
+  - name: Debug - Show default route IP
+    debug:
+      msg: "Default route IP: {{ default_route_ip.stdout }}"
+    when: not cluster_initialized
+
+  - name: Prompt for master IP confirmation
+    pause:
+      prompt: |
+        Available IPs:
+        {{ all_ips.stdout_lines | join('\n') }}
+        
+        Default route IP: {{ default_route_ip.stdout }}
+        
+        Press ENTER to use default route IP or Ctrl+C and specify correct IP in inventory
+    when: not cluster_initialized
+
+  - name: Set master_private_ip fact
+    set_fact:
+      master_private_ip: "{{ default_route_ip.stdout }}"
+    when: not cluster_initialized
+
+  - name: Confirm selected master IP
+    debug:
+      msg: "Using master IP: {{ master_private_ip }}"
+    when: not cluster_initialized
 
   - name: Set pod_cidr and nodename facts
     set_fact:
       pod_cidr: "192.168.0.0/16"
       nodename: "{{ ansible_hostname }}"
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
 
   - name: Initialize the Kubernetes Cluster (kubeadm init)
     command: >-
-      kubeadm init --apiserver-advertise-address={{ master_private_ip.stdout }}
-      --apiserver-cert-extra-sans={{ master_private_ip.stdout }}
+      kubeadm init --apiserver-advertise-address={{ master_private_ip }}
+      --apiserver-cert-extra-sans={{ master_private_ip }}
       --pod-network-cidr={{ pod_cidr }}
       --node-name={{ nodename }} --ignore-preflight-errors=Swap
     register: kubeinit_details
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
 
   - name: Debug kubeadm init output
     debug:
       var: kubeinit_details
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
 
-  - name: Ensure .kube directory exists for the ansible user
-    file:
-      path: "{{ ansible_env.HOME }}/.kube"
-      state: directory
-      mode: '0755'
-
-  - name: Copy admin.conf to user's .kube/config
+  - name: Copy admin.conf to /root/.kube/config after kubeadm init
     copy:
       src: /etc/kubernetes/admin.conf
-      dest: "{{ ansible_env.HOME }}/.kube/config"
+      dest: /root/.kube/config
       remote_src: yes
       mode: '0644'
+    when: not cluster_initialized
     notify: wait-for-apiserver
 
-  - name: Ensure kube config ownership
+  - name: Ensure kube config ownership is root:root
     file:
-      path: "{{ ansible_env.HOME }}/.kube/config"
-      owner: "{{ ansible_user_id }}"
-      group: "{{ ansible_user_gid }}"
+      path: /root/.kube/config
+      owner: root
+      group: root
+    when: not cluster_initialized
 
   - name: Apply Calico CNI using kubectl with kubeconfig
     command: kubectl --kubeconfig={{ ansible_env.HOME }}/.kube/config apply -f https://raw.githubusercontent.com/sudhanshuvlog/kubernetes-multinode-cluster-ansible-aws/main/calico.yaml
@@ -58,32 +123,158 @@
     failed_when: calico_apply.rc != 0 and calico_apply.rc != 1
     # rc==1 sometimes indicates resources already exist; tolerate it
 
-  - name: Generate join command on master
-    command: kubeadm token create --print-join-command
+  - name: Generate join command on master (non-expiring token)
+    command: kubeadm token create --print-join-command --ttl 0
     register: join_command
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
 
   - name: Save join command to file on master
     copy:
-      content: "{{ join_command.stdout_lines[0] }}"
+      content: "{{ join_command.stdout }}"
       dest: /tmp/join-command.sh
       mode: '0700'
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
+
+  - name: Print the join command (for operator visibility)
+    debug:
+      msg: "Join command: {{ join_command.stdout }}"
+    when: not cluster_initialized
+
+  - name: Print join command on controller (delegated)
+    debug:
+      msg: |
+        ================== JOIN COMMAND ==================
+        {{ join_command.stdout }}
+        ================================================
+    delegate_to: localhost
+    when: not cluster_initialized
+
+  - name: Save join command to controller with timestamp
+    copy:
+      content: "{{ join_command.stdout }}"
+      dest: "{{ playbook_dir }}/join-command-{{ ansible_date_time.iso8601_basic_short }}"
+    delegate_to: localhost
+    when: not cluster_initialized
 
   - name: Copy join command to controller (local file)
     local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
-    when: kubectl_status.rc != 0
+    when: not cluster_initialized
+
+  handlers:
+  - name: wait-for-apiserver
+    block:
+      - name: Wait for api-server port 6443 to be open
+        ansible.builtin.wait_for:
+          host: 127.0.0.1
+          port: 6443
+          timeout: 300
+
+      - name: Wait for api-server /healthz to return ok
+        ansible.builtin.shell: |
+          for i in $(seq 1 30); do
+            if curl -ksS https://127.0.0.1:6443/healthz | grep -q "ok"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+        register: apiserver_health
+        failed_when: apiserver_health.rc != 0
 
 - name: In the worker Node
   hosts: k8s-workers
   become: true
   tasks:
-  - name: Copy the join command to server location
+  - name: Check if node is already joined to cluster
+    shell: "crictl ps 2>/dev/null | grep -q kube || echo 'not-joined'"
+    register: node_status
+    changed_when: false
+    ignore_errors: true
+
+  - name: Debug node status check
+    debug:
+      msg: "Node status: {{ node_status.stdout }}"
+
+  - name: Check kubeadm version
+    command: kubeadm version
+    register: kubeadm_ver
+    changed_when: false
+
+  - name: Debug kubeadm version
+    debug:
+      msg: "Kubeadm version: {{ kubeadm_ver.stdout }}"
+
+  - name: Reset kubeadm if previous join failed
+    command: kubeadm reset -f
+    when: node_status.stdout == "not-joined"
+    ignore_errors: true
+
+  - name: Check if join command exists on controller
+    delegate_to: localhost
+    stat:
+      path: "./join-command"
+    register: controller_join_stat
+
+  - name: Fail if join command doesn't exist
+    fail:
+      msg: "Join command file not found on controller. Please ensure master node setup completed successfully."
+    when: not controller_join_stat.stat.exists
+
+  - name: Read join command from controller
+    delegate_to: localhost
+    command: cat ./join-command
+    register: join_command_content
+    when: controller_join_stat.stat.exists
+
+  - name: Debug join command content
+    debug:
+      msg: "Join command to be executed: {{ join_command_content.stdout }}"
+    when: controller_join_stat.stat.exists
+
+  - name: Copy the join command to worker node
     copy:
-      src: join-command
+      content: "{{ join_command_content.stdout }}"
       dest: /tmp/join-command.sh
       mode: '0700'
-    when: not lookup('file', '/tmp/join-command.sh', errors='ignore')
+    when: controller_join_stat.stat.exists
 
-  - name: Join the node to cluster
-    command: sh /tmp/join-command.sh
+  - name: Run the kubeadm join command with extended debugging
+    shell: |
+      set -x
+      echo "=== System Info ==="
+      uname -a
+      echo "=== Container Runtime Status ==="
+      crictl info || true
+      echo "=== Network Status ==="
+      ip addr show
+      echo "=== DNS Resolution ==="
+      cat /etc/resolv.conf
+      echo "=== Execute Join Command ==="
+      bash -x /tmp/join-command.sh
+    register: join_result
+    failed_when: false
+    args:
+      executable: /bin/bash
+
+  - name: Show detailed join output
+    debug:
+      msg: |
+        === JOIN COMMAND EXECUTION RESULTS ===
+        Exit Code: {{ join_result.rc }}
+        STDOUT:
+        {{ join_result.stdout }}
+        
+        STDERR:
+        {{ join_result.stderr }}
+
+  - name: Verify node joined successfully
+    shell: crictl ps | grep -q kube
+    register: verify_join
+    retries: 3
+    delay: 10
+    until: verify_join.rc == 0
+    ignore_errors: yes
+
+  - name: Final node status
+    debug:
+      msg: "Node join status: {{ 'SUCCESS' if verify_join.rc == 0 else 'FAILED' }}"
