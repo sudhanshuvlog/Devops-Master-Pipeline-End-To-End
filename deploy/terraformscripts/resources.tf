@@ -1,8 +1,8 @@
 resource "aws_instance" "web" {
-  depends_on = [aws_key_pair.my_key_pair, aws_security_group.webserver_sg]
+  depends_on = [aws_security_group.webserver_sg]
   ami           = data.aws_ami.latest_amazon_linux.id
   instance_type = var.instanceType
-  key_name      = aws_key_pair.my_key_pair.key_name
+  key_name      = var.key_name
   vpc_security_group_ids = [aws_security_group.webserver_sg.id]
   count = var.instance_count
 
@@ -15,10 +15,7 @@ resource "aws_instance" "web" {
   }
 }
 
-resource "aws_key_pair" "my_key_pair" {
-  key_name   = var.key_name
-  public_key = file(var.public_key_path)
-}
+
 
 resource "aws_security_group" "webserver_sg" {
   name        = var.sg_name
@@ -56,13 +53,13 @@ resource "null_resource" "configureAnsibleInventory" {
     command = <<-EOT
       cat > inventory <<INV
       [k8s-master]
-      ${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/mykey
+  ${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem
 
       [k8s-workers]
       INV
       for ip in ${join(" ", aws_instance.web[*].public_ip)}; do
         if [ "$ip" != "${aws_instance.web[0].public_ip}" ]; then
-          echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/mykey" >> inventory
+          echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem" >> inventory
         fi
       done
     EOT
