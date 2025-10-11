@@ -49,6 +49,9 @@ resource "null_resource" "configureAnsibleInventory" {
     ips = join(",", aws_instance.web[*].public_ip)
   }
 
+  # Ensure inventory is generated only after instances are created and their public IPs are known
+  depends_on = [aws_instance.web]
+
     provisioner "local-exec" {
     command = <<EOT
 cat > inventory <<INV
@@ -56,12 +59,8 @@ cat > inventory <<INV
 ${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem
 
 [k8s-workers]
+${join("\n", [for ip in aws_instance.web[*].public_ip : "${ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem" if ip != aws_instance.web[0].public_ip])}
 INV
-for ip in ${join(" ", aws_instance.web[*].public_ip)}; do
-  if [ "$ip" != "${aws_instance.web[0].public_ip}" ]; then
-    echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem" >> inventory
-  fi
-done
 EOT
     interpreter = ["/bin/bash", "-c"]
   }
