@@ -50,19 +50,19 @@ resource "null_resource" "configureAnsibleInventory" {
   }
 
     provisioner "local-exec" {
-    command = <<-EOT
-      cat > inventory <<INV
-      [k8s-master]
-  ${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem
+    command = <<EOT
+cat > inventory <<INV
+[k8s-master]
+${aws_instance.web[0].public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem
 
-      [k8s-workers]
-      INV
-      for ip in ${join(" ", aws_instance.web[*].public_ip)}; do
-        if [ "$ip" != "${aws_instance.web[0].public_ip}" ]; then
-          echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem" >> inventory
-        fi
-      done
-    EOT
+[k8s-workers]
+INV
+for ip in ${join(" ", aws_instance.web[*].public_ip)}; do
+  if [ "$ip" != "${aws_instance.web[0].public_ip}" ]; then
+    echo "$ip ansible_user=ec2-user ansible_ssh_private_key_file=${path.module}/../playbooks/gfg37ansible.pem" >> inventory
+  fi
+done
+EOT
     interpreter = ["/bin/bash", "-c"]
   }
 }
