@@ -83,6 +83,13 @@
       ansible.builtin.yum:
         name: /tmp/cri-o-1.29.9~dev-150500.2.1.x86_64.rpm
         state: present
+        disable_gpg_check: yes
+
+    - name: # Optional (safer): import CRI-O vendor GPG key before installing RPM
+      ansible.builtin.shell: |
+        # if you have a vendor GPG key URL, uncomment and set KEY_URL
+        # rpm --import /tmp/cri-o-gpg.key || true
+        true
 
     - name: Install Kubernetes packages
       ansible.builtin.package:

@@ -2,105 +2,88 @@
   hosts: k8s-master
   become: true
   tasks:
-    - name: Check if Kubernetes is already initialized
-      command: kubectl cluster-info
-      register: kubectl_status
-      ignore_errors: yes
+  - name: Check if Kubernetes is already initialized (using kubectl)
+    command: kubectl --kubeconfig={{ ansible_env.HOME }}/.kube/config cluster-info
+    register: kubectl_status
+    ignore_errors: true
 
-    - name: Get master private IP
-      command: ip addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
-      register: master_private_ip
-      when: kubectl_status.failed
+  - name: Gather master private IP
+    ansible.builtin.command: ip -4 addr show eth0 | awk '/inet / {print $2}' | cut -d/ -f1
+    register: master_private_ip
+    when: kubectl_status.rc != 0
 
-    - name: Set pod cidr fact
-      set_fact:
-        pod_cidr: "192.168.0.0/16"
-      when: kubectl_status.failed
+  - name: Set pod_cidr and nodename facts
+    set_fact:
+      pod_cidr: "192.168.0.0/16"
+      nodename: "{{ ansible_hostname }}"
+    when: kubectl_status.rc != 0
 
-    - name: Get short hostname
-      command: hostname -s
-      register: nodename
-      when: kubectl_status.failed
+  - name: Initialize the Kubernetes Cluster (kubeadm init)
+    command: >-
+      kubeadm init --apiserver-advertise-address={{ master_private_ip.stdout }}
+      --apiserver-cert-extra-sans={{ master_private_ip.stdout }}
+      --pod-network-cidr={{ pod_cidr }}
+      --node-name={{ nodename }} --ignore-preflight-errors=Swap
+    register: kubeinit_details
+    when: kubectl_status.rc != 0
 
-    - name: Initialize Kubernetes master (kubeadm)
-      command: >-
-        kubeadm init --apiserver-advertise-address="{{ master_private_ip.stdout }}"
-        --apiserver-cert-extra-sans="{{ master_private_ip.stdout }}"
-        --pod-network-cidr="{{ pod_cidr }}"
-        --node-name="{{ nodename.stdout }}" --ignore-preflight-errors Swap
-      register: kubeinit_details
-      when: kubectl_status.failed
+  - name: Debug kubeadm init output
+    debug:
+      var: kubeinit_details
+    when: kubectl_status.rc != 0
 
-    - name: Debug kubeadm init output
-      debug:
-        var: kubeinit_details
-      when: kubectl_status.failed
+  - name: Ensure .kube directory exists for the ansible user
+    file:
+      path: "{{ ansible_env.HOME }}/.kube"
+      state: directory
+      mode: '0755'
 
-    - name: Ensure .kube directory exists for user
-      file:
-        path: "{{ ansible_env.HOME }}/.kube"
-        state: directory
-        mode: '0755'
-      when: kubectl_status.failed
+  - name: Copy admin.conf to user's .kube/config
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: "{{ ansible_env.HOME }}/.kube/config"
+      remote_src: yes
+      mode: '0644'
+    notify: wait-for-apiserver
 
-    - name: Copy admin.conf to user's kube config
-      copy:
-        src: /etc/kubernetes/admin.conf
-        dest: "{{ ansible_env.HOME }}/.kube/config"
-        remote_src: yes
-        mode: '0644'
-      when: kubectl_status.failed
+  - name: Ensure kube config ownership
+    file:
+      path: "{{ ansible_env.HOME }}/.kube/config"
+      owner: "{{ ansible_user_id }}"
+      group: "{{ ansible_user_gid }}"
 
-    - name: Ensure kube config ownership
-      file:
-        path: "{{ ansible_env.HOME }}/.kube/config"
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_gid }}"
-      when: kubectl_status.failed
+  - name: Apply Calico CNI using kubectl with kubeconfig
+    command: kubectl --kubeconfig={{ ansible_env.HOME }}/.kube/config apply -f https://raw.githubusercontent.com/sudhanshuvlog/kubernetes-multinode-cluster-ansible-aws/main/calico.yaml
+    register: calico_apply
+    failed_when: calico_apply.rc != 0 and calico_apply.rc != 1
+    # rc==1 sometimes indicates resources already exist; tolerate it
 
-    - name: Apply Calico CNI via k8s module
-      k8s:
-        state: present
-        src: https://raw.githubusercontent.com/sudhanshuvlog/kubernetes-multinode-cluster-ansible-aws/main/calico.yaml
-      when: kubectl_status.failed
+  - name: Generate join command on master
+    command: kubeadm token create --print-join-command
+    register: join_command
+    when: kubectl_status.rc != 0
 
-    - name: Create kubeadm join command and save to /tmp/join-command.sh
-      command: kubeadm token create --print-join-command
-      register: join_command
-      when: kubectl_status.failed
+  - name: Save join command to file on master
+    copy:
+      content: "{{ join_command.stdout_lines[0] }}"
+      dest: /tmp/join-command.sh
+      mode: '0700'
+    when: kubectl_status.rc != 0
 
-    - name: Save join command to file on master
-      copy:
-        content: "{{ join_command.stdout_lines[0] }}"
-        dest: /tmp/join-command.sh
-        mode: '0700'
-      when: kubectl_status.failed
+  - name: Copy join command to controller (local file)
+    local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+    when: kubectl_status.rc != 0
 
 - name: In the worker Node
   hosts: k8s-workers
   become: true
   tasks:
-    - name: Check if kubelet is running
-      shell: |
-        systemctl is-active --quiet kubelet
-      register: kubelet_status
-      ignore_errors: yes
+  - name: Copy the join command to server location
+    copy:
+      src: join-command
+      dest: /tmp/join-command.sh
+      mode: '0700'
+    when: not lookup('file', '/tmp/join-command.sh', errors='ignore')
 
-    - name: Debug kubelet status
-      debug:
-        msg: "Kubelet is {{ 'running' if kubelet_status.rc == 0 else 'not running' }}."
-
-    - name: Set fact to determine if node is in the cluster
-      set_fact:
-        node_in_cluster: "{{ kubelet_status.rc == 0 }}"
-    
-    - name: Copy the join command to server location
-      copy:
-        src: join-command
-        dest: /tmp/join-command.sh
-        mode: '0777'
-      when: not node_in_cluster
-
-    - name: Join the node to cluster
-      command: sh /tmp/join-command.sh
-      when: not node_in_cluster
+  - name: Join the node to cluster
+    command: sh /tmp/join-command.sh

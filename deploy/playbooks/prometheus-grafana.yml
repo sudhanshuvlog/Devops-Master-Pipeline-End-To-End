@@ -1,10 +1,15 @@
----
 - name: Install Helm and Prometheus
   hosts: k8s-master  # Run tasks on all hosts
   become: true  # Run tasks with sudo
+  collections:
+    - community.kubernetes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
-    - name: Ensure community.kubernetes collection is installed (best-effort)
+    - name: Ensure community.kubernetes collection is installed on controller (best-effort)
+      delegate_to: localhost
+      become: false
       ansible.builtin.command: ansible-galaxy collection install community.kubernetes
       changed_when: false
       failed_when: false
@@ -14,36 +19,97 @@
         name: socat
         state: present
 
-    - name: Apply PV manifests (if present)
-      k8s:
+    - name: Ensure python3-pip is installed (so we can pip-install kubernetes client)
+      ansible.builtin.package:
+        name: python3-pip
         state: present
+
+    - name: Install Python kubernetes client via pip3
+      ansible.builtin.pip:
+        name: kubernetes
+        executable: pip3
+      become: true
+
+    - name: Download Helm on remote master
+      ansible.builtin.get_url:
+        url: https://get.helm.sh/helm-v3.7.1-linux-amd64.tar.gz
+        dest: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+
+    - name: Ensure destination directory exists
+      ansible.builtin.file:
+        path: /tmp/helm
+        state: directory
+
+    - name: Extract Helm
+      ansible.builtin.unarchive:
+        src: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+        dest: /tmp/helm
+        remote_src: yes
+
+    - name: Move Helm to /bin
+      ansible.builtin.command: mv /tmp/helm/linux-amd64/helm /bin/helm
+      become: true
+
+    - name: Check Helm version
+      ansible.builtin.command: helm version
+
+    - name: Copy the k8s pv files to target node
+      ansible.builtin.copy:
         src: "{{ item }}"
+        dest: "/{{ item | basename }}"
       loop:
         - ../permissions-pv.yml
         - ../prometheus-server1pv.yml
         - ../prometheus-serverpv.yml
-      register: pv_apply
+
+    - name: Make the deployments with kubectl
+      ansible.builtin.command: "kubectl apply -f {{ item }}"
+      loop:
+        - permissions-pv.yml
+        - prometheus-server1pv.yml
+        - prometheus-serverpv.yml
+      args:
+        chdir: /
+
+    - name: Add Prometheus Helm repository
+      ansible.builtin.command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+    - name: Update Helm repositories
+      ansible.builtin.command: helm repo update
+
+    - name: Install or upgrade Prometheus using Helm (non-blocking, retry on concurrent ops)
+      ansible.builtin.command: >-
+        helm upgrade --install prometheus prometheus-community/prometheus
+        --namespace monitoring --create-namespace
+      register: prometheus_release
+      retries: 8
+      delay: 10
+      until: prometheus_release.rc == 0
+
+    - name: Expose Prometheus service using kubectl in monitoring namespace
+      ansible.builtin.command: kubectl -n monitoring expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090
       ignore_errors: true
 
-    - name: Add prometheus-community helm repo using shell fallback
-      ansible.builtin.command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      register: helm_add_prom
-      failed_when: false
-
-    - name: Update helm repos (fallback)
+    - name: Update Helm repositories for Grafana
       ansible.builtin.command: helm repo update
-      failed_when: false
+      ignore_errors: yes
 
-    - name: Install Prometheus using Helm (community.kubernetes.helm)
-      community.kubernetes.helm:
-        name: prometheus
-        chart_ref: prometheus-community/prometheus
-        release_namespace: monitoring
-        create_namespace: yes
-        wait: yes
-        timeout: 600
-      register: prometheus_release
-      failed_when: prometheus_release is failed
+    - name: Add Helm repo for Grafana
+      ansible.builtin.command: helm repo add grafana https://grafana.github.io/helm-charts
+      ignore_errors: yes
+
+    - name: Install or upgrade Grafana using Helm (non-blocking, retry on concurrent ops)
+      ansible.builtin.command: >-
+        helm upgrade --install grafana grafana/grafana
+        --namespace monitoring --create-namespace
+      register: grafana_release
+      retries: 8
+      delay: 10
+      until: grafana_release.rc == 0
+
+    - name: Expose Grafana service using kubectl in monitoring namespace
+      ansible.builtin.command: kubectl -n monitoring expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=3000
+      ignore_errors: true
 
     - name: Ensure prometheus service is present and exposed (NodePort)
       k8s:
@@ -63,21 +129,6 @@
                 targetPort: 9090
       register: prometheus_svc
       failed_when: false
-
-    - name: Add grafana helm repo (fallback)
-      ansible.builtin.command: helm repo add grafana https://grafana.github.io/helm-charts
-      failed_when: false
-
-    - name: Install Grafana using Helm
-      community.kubernetes.helm:
-        name: grafana
-        chart_ref: grafana/grafana
-        release_namespace: monitoring
-        create_namespace: yes
-        wait: yes
-        timeout: 600
-      register: grafana_release
-      failed_when: grafana_release is failed
 
     - name: Ensure grafana service exposed (NodePort)
       k8s:
