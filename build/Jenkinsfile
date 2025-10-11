@@ -94,7 +94,15 @@ pipeline {
                 dir("${ANSIBLE_DIR}") {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
                         sh 'cp ${SSH_KEY} ./mykey && chmod 400 mykey'
-                        sh 'ansible-playbook -i inventory rhel_common.yaml'
+                                                // validate the SSH private key can be parsed by ssh-keygen (fail early with descriptive error)
+                                                sh '''#!/bin/bash -l
+                                                if ! ssh-keygen -y -f ./mykey > /dev/null 2>&1; then
+                                                    echo 'ERROR: SSH private key at ./mykey is invalid or in unsupported format for OpenSSH/libcrypto.'
+                                                    echo 'Make sure your Jenkins Secret File contains a proper PEM/OpenSSH private key (not a public key).' >&2
+                                                    exit 2
+                                                fi
+                                                '''
+                                                sh 'ansible-playbook -i inventory rhel_common.yaml'
                         sh 'ansible-playbook -i inventory rhel_master.yaml'
                     }
                 }
