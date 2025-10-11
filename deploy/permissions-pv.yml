@@ -1,8 +1,8 @@
 apiVersion: batch/v1
 kind: Job
-namespace: monitoring
 metadata:
   name: fix-permissions
+  namespace: monitoring
 spec:
   template:
     spec:
