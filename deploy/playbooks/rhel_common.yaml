@@ -8,6 +8,7 @@
     - iproute-tc
     - git
   tasks:
+    - name: Disable swap
       ansible.builtin.shell: swapoff -a
       args:
         warn: false
@@ -108,5 +109,3 @@
   handlers:
     - name: reload-modules
       ansible.builtin.command: sysctl --system
-        state: started
-        enabled: true
