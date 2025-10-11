@@ -93,12 +93,26 @@ pipeline {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
-                        sh 'cp ${SSH_KEY} ./mykey && chmod 400 mykey'
-                                                // validate the SSH private key can be parsed by ssh-keygen (fail early with descriptive error)
+                                                sh 'cp ${SSH_KEY} ./mykey && chmod 400 mykey'
+                                                // normalize line endings and remove BOM (if any) to reduce format issues
                                                 sh '''#!/bin/bash -l
+                                                set -e
+                                                # remove BOM if present and convert CRLF to LF
+                                                sed -i '1s/^\xEF\xBB\xBF//' ./mykey || true
+                                                if grep -q $'\r' ./mykey; then
+                                                    echo 'Converting CRLF to LF in SSH key'
+                                                    tr -d '\r' < ./mykey > ./mykey.tmp && mv ./mykey.tmp ./mykey
+                                                    chmod 400 ./mykey
+                                                fi
+
+                                                # quick non-secret inspection: print the key header
+                                                echo "SSH key header: $(head -n1 ./mykey | sed -E 's/(.{40}).*/\1.../')"
+
+                                                # validate the SSH private key can be parsed by ssh-keygen (fail early with descriptive error)
                                                 if ! ssh-keygen -y -f ./mykey > /dev/null 2>&1; then
                                                     echo 'ERROR: SSH private key at ./mykey is invalid or in unsupported format for OpenSSH/libcrypto.'
                                                     echo 'Make sure your Jenkins Secret File contains a proper PEM/OpenSSH private key (not a public key).' >&2
+                                                    echo 'Printed key header above for debugging (non-secret truncated).' >&2
                                                     exit 2
                                                 fi
                                                 '''
