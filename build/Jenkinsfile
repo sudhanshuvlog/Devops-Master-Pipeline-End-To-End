@@ -35,14 +35,7 @@ pipeline {
                                 # Ensure ansible is present (best-effort installation)
                                 if ! command -v ansible-playbook >/dev/null 2>&1; then
                                     echo "Ansible not found, attempting to install..."
-                                    if command -v yum >/dev/null 2>&1; then
-                                        sudo yum install -y ansible || echo 'yum install ansible failed'
-                                    elif command -v apt-get >/dev/null 2>&1; then
-                                        sudo apt-get update || true
-                                        sudo apt-get install -y ansible || echo 'apt-get install ansible failed'
-                                    else
-                                        echo 'No supported package manager found to install ansible automatically.'
-                                    fi
+                                    sudo yum install -y ansible || echo 'yum install ansible failed'
                                 else
                                     echo "Ansible already installed: $(ansible --version | head -n1)"
                                 fi
@@ -94,7 +87,7 @@ pipeline {
                 dir("${ANSIBLE_DIR}") {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
                         sh 'cp ${SSH_KEY} ./gfg37ansible.pem && chmod 400 gfg37ansible.pem'
-                        sh 'sleep 60' // Wait for instances to be ready
+                        sh 'sleep 100' // Wait for instances to be ready
                                                 sh 'ansible-playbook -i inventory rhel_common.yaml'
                         sh 'ansible-playbook -i inventory rhel_master.yaml'
                     }

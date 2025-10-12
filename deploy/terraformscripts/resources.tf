@@ -33,7 +33,7 @@ resource "aws_security_group" "webserver_sg" {
       cidr_blocks = ["0.0.0.0/0"]
     }
   }
-  ingress {
+  ingress { #Allowing all traffic within the SG (for k8s node communication) - I will remove this in upcoming changes
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
