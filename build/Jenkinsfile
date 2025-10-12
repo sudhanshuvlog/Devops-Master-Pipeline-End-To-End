@@ -1,6 +1,10 @@
 pipeline {
     agent { label 'ec2' }
 
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'prod'], description: 'Select target environment namespace')
+    }
+
     environment {
         TERRAFORM_DIR = './deploy/terraformscripts'
         ANSIBLE_DIR   = './deploy/playbooks'
@@ -14,35 +18,35 @@ pipeline {
     stages {
         stage('Prepare Tools') {
             steps {
-                                echo 'Ensure ansible and terraform are available on the agent (will install terraform if missing)'
-                                sh '''#!/bin/bash -l
-                                set -e
-                                # Install Terraform if missing
-                                if ! command -v terraform >/dev/null 2>&1; then
-                                    echo "Terraform not found, installing..."
-                                    TF_VERSION=1.6.0
-                                    TF_ZIP="terraform_${TF_VERSION}_linux_amd64.zip"
-                                    if [ ! -f "${TF_ZIP}" ]; then
-                                        wget "https://releases.hashicorp.com/terraform/${TF_VERSION}/${TF_ZIP}"
-                                    fi
-                                    unzip -o "${TF_ZIP}"
-                                    sudo mv -f terraform /usr/local/bin/terraform
-                                    rm -f "${TF_ZIP}"
-                                else
-                                    echo "Terraform already installed: $(terraform --version | head -n1)"
-                                fi
+                echo 'Ensure ansible and terraform are available on the agent (will install terraform if missing)'
+                sh '''#!/bin/bash -l
+                set -e
+                # Install Terraform if missing
+                if ! command -v terraform >/dev/null 2>&1; then
+                    echo "Terraform not found, installing..."
+                    TF_VERSION=1.6.0
+                    TF_ZIP="terraform_${TF_VERSION}_linux_amd64.zip"
+                    if [ ! -f "${TF_ZIP}" ]; then
+                        wget "https://releases.hashicorp.com/terraform/${TF_VERSION}/${TF_ZIP}"
+                    fi
+                    unzip -o "${TF_ZIP}"
+                    sudo mv -f terraform /usr/local/bin/terraform
+                    rm -f "${TF_ZIP}"
+                else
+                    echo "Terraform already installed: $(terraform --version | head -n1)"
+                fi
 
-                                # Ensure ansible is present (best-effort installation)
-                                if ! command -v ansible-playbook >/dev/null 2>&1; then
-                                    echo "Ansible not found, attempting to install..."
-                                    sudo yum install -y ansible || echo 'yum install ansible failed'
-                                else
-                                    echo "Ansible already installed: $(ansible --version | head -n1)"
-                                fi
+                # Ensure ansible is present (best-effort installation)
+                if ! command -v ansible-playbook >/dev/null 2>&1; then
+                    echo "Ansible not found, attempting to install..."
+                    sudo yum install -y ansible || echo 'yum install ansible failed'
+                else
+                    echo "Ansible already installed: $(ansible --version | head -n1)"
+                fi
 
-                                terraform --version || true
-                                ansible --version || true
-                                '''
+                terraform --version || true
+                ansible --version || true
+                '''
             }
         }
 
@@ -88,7 +92,7 @@ pipeline {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
                         sh 'cp ${SSH_KEY} ./gfg37ansible.pem && chmod 400 gfg37ansible.pem'
                         sh 'sleep 100' // Wait for instances to be ready
-                                                sh 'ansible-playbook -i inventory rhel_common.yaml'
+                        sh 'ansible-playbook -i inventory rhel_common.yaml'
                         sh 'ansible-playbook -i inventory rhel_master.yaml'
                     }
                 }
@@ -107,7 +111,13 @@ pipeline {
                 stage('Application Deploy') {
                     steps {
                         dir("${ANSIBLE_DIR}") {
-                            sh 'ansible-playbook -i inventory deployDeployment.yml'
+                            script {
+                                echo "Deploying to ${params.ENVIRONMENT} environment..."
+                                sh """
+                                    ansible-playbook -i inventory deployDeployment.yml \
+                                    --extra-vars "namespace=${params.ENVIRONMENT} app_name=gfgdeployment"
+                                """
+                            }
                         }
                     }
                 }
@@ -119,6 +129,12 @@ pipeline {
         always {
             echo 'Pipeline finished'
             archiveArtifacts artifacts: 'deploy/terraformscripts/*.tfstate, deploy/terraformscripts/inventory', allowEmptyArchive: true
+        }
+        success {
+            echo "Deployment successful to ${params.ENVIRONMENT} environment"
+        }
+        failure {
+            echo "Deployment failed for ${params.ENVIRONMENT} environment"
         }
     }
 }

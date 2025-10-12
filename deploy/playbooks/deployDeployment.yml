@@ -4,17 +4,31 @@
   become: true
 
   vars:
-    app_name: gfgdeployment
-    namespace: default
+    app_name: "{{ app_name | default('gfgdeployment') }}"
+    namespace: "{{ namespace | default('default') }}"
     manifest_file: /tmp/deployment.yaml
 
   tasks:
+
+    - name: Ensure target namespace exists
+      ansible.builtin.shell: |
+        kubectl create namespace {{ namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      args:
+        executable: /bin/bash
+      register: ns_result
 
     - name: Copy Kubernetes deployment manifest
       copy:
         src: ../deployment.yaml
         dest: "{{ manifest_file }}"
         remote_src: no
+
+    - name: Replace namespace placeholder in manifest
+      ansible.builtin.replace:
+        path: "{{ manifest_file }}"
+        regexp: 'namespace:.*'
+        replace: "namespace: {{ namespace }}"
+      ignore_errors: true
 
     - name: Copy startservers.sh script
       copy:
@@ -29,7 +43,7 @@
       ignore_errors: true
 
     - name: Create deployment and service if not present
-      command: "kubectl create -f {{ manifest_file }}"
+      command: "kubectl create -f {{ manifest_file }} -n {{ namespace }}"
       when: deployment_check.rc != 0
       register: create_result
       ignore_errors: true
@@ -40,9 +54,8 @@
       register: rollout_result
       ignore_errors: true
 
-  
     - name: Ensure service is created or updated
-      command: "kubectl apply -f {{ manifest_file }}"
+      command: "kubectl apply -f {{ manifest_file }} -n {{ namespace }}"
       register: service_apply
       ignore_errors: true
 
