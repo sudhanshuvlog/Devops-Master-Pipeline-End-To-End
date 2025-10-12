@@ -91,7 +91,7 @@ pipeline {
                 dir("${ANSIBLE_DIR}") {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
                         sh 'cp ${SSH_KEY} ./gfg37ansible.pem && chmod 400 gfg37ansible.pem'
-                        sh 'sleep 100' // Wait for instances to be ready
+                        sh 'sleep 30' // Wait for instances to be ready
                         sh 'ansible-playbook -i inventory rhel_common.yaml'
                         sh 'ansible-playbook -i inventory rhel_master.yaml'
                     }

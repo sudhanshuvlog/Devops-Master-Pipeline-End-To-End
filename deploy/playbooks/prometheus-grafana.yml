@@ -63,7 +63,8 @@
         - ../prometheus-serverpv.yml
 
     - name: Create namespace monitoring
-      ansible.builtin.command: kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+      ansible.builtin.command: kubectl create namespace monitoring
+      ignore_errors: true
 
 
     - name: Make the deployments with kubectl
