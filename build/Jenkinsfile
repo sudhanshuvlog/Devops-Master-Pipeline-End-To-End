@@ -128,7 +128,9 @@ pipeline {
         stage('Promote to QA') {
             steps {
                 script {
-                    input message: "✅ Proceed with deployment to QA?", ok: "Deploy QA"
+                    timeout(time: 2, unit: 'MINUTES') {  //Auto abort after 2 minutes
+                    input message: "Proceed with deployment to QA?", ok: "Deploy QA"
+                    }
                     dir("${ANSIBLE_DIR}") {
                         sh """
                             ansible-playbook -i inventory deployDeployment.yml \
@@ -142,7 +144,9 @@ pipeline {
         stage('Promote to PROD') {
             steps {
                 script {
-                    input message: "🚀 Promote to PROD environment?", ok: "Deploy PROD"
+                    timeout(time: 2, unit: 'MINUTES') { // Auto abort after 2 minutes
+                    input message: "Promote to PROD environment?", ok: "Deploy PROD"
+                    }
                     dir("${ANSIBLE_DIR}") {
                         sh """
                             ansible-playbook -i inventory deployDeployment.yml \
