@@ -62,6 +62,15 @@
         - ../prometheus-server1pv.yml
         - ../prometheus-serverpv.yml
 
+    - name: Create namespace monitoring
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: monitoring
+
     - name: Make the deployments with kubectl
       ansible.builtin.command: "kubectl apply -f {{ item }}"
       loop:
