@@ -30,11 +30,9 @@
 
     - name: Install Calico (only once)
       command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/calico.yaml
-      when: not kubeadm_conf.stat.exists
 
     - name: Generate join command
       command: kubeadm token create --print-join-command
-      when: kubeadm_conf.stat.exists
       register: join_cmd
 
     - name: Save join command locally
