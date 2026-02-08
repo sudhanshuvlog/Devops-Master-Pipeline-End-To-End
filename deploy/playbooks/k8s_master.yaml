@@ -8,26 +8,36 @@
         master_ip: "{{ ansible_default_ipv4.address }}"
         node_name: "{{ ansible_hostname }}"
 
+    - name: Check if Kubernetes cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_conf
+
     - name: Initialize Kubernetes cluster
       command: >
         kubeadm init
         --apiserver-advertise-address={{ master_ip }}
         --pod-network-cidr=192.168.0.0/16
         --node-name={{ node_name }}
+      when: not kubeadm_conf.stat.exists
 
     - name: Setup kubeconfig
       shell: |
         mkdir -p $HOME/.kube
         cp /etc/kubernetes/admin.conf $HOME/.kube/config
         chown $(id -u):$(id -g) $HOME/.kube/config
+      when: kubeadm_conf.stat.exists or kubeadm_conf is changed
 
-    - name: Install Calico (official, compatible)
+    - name: Install Calico (only once)
       command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/calico.yaml
+      when: not kubeadm_conf.stat.exists
 
     - name: Generate join command
       command: kubeadm token create --print-join-command
+      when: kubeadm_conf.stat.exists
       register: join_cmd
 
     - name: Save join command locally
       local_action:
         copy content="{{ join_cmd.stdout }}" dest="./join-command.sh"
+      when: join_cmd is defined
