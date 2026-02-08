@@ -93,8 +93,9 @@ pipeline {
                         //sh 'touch gfg37ansible.pem'
                         sh 'cp ${SSH_KEY} ./gfg37ansible.pem && chmod 400 gfg37ansible.pem'
                         sh 'sleep 60' // Wait for instances to be ready
-                        sh 'ansible-playbook -i inventory rhel_common.yaml'
-                        sh 'ansible-playbook -i inventory rhel_master.yaml'
+                        sh 'ansible-playbook -i inventory k8s_common.yaml'
+                        sh 'ansible-playbook -i inventory k8s_master.yaml'
+                        sh 'ansible-playbook -i inventory k8s_workers.yaml'
                     }
                 }
             }

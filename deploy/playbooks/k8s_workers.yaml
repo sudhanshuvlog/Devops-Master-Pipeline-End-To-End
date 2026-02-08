@@ -1,0 +1,13 @@
+- name: Join Worker Nodes
+  hosts: k8s-workers
+  become: true
+
+  tasks:
+    - name: Copy join command
+      copy:
+        src: join-command.sh
+        dest: /tmp/join.sh
+        mode: 0755
+
+    - name: Join cluster
+      command: bash /tmp/join.sh
