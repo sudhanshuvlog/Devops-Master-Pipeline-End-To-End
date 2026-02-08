@@ -1,5 +1,5 @@
- wget https://download.oracle.com/java/17/archive/jdk-17.0.10_linux-x64_bin.rpm
- yum install jdk-17.0.10_linux-x64_bin.rpm -y
+ wget https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.rpm
+yum install jdk-21_linux-x64_bin.rpm -y
 
  #Start the agent and join it to the Jenkins Master Node(You will get these below command, from jenkins master while adding this node)
 

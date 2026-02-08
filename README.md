@@ -25,7 +25,7 @@ My recorded session for this project is uploaded on GeeksForGeeks - https://www.
 - Install Docker on the instance.
 - Configure Jenkins using the following command:
   ```bash
-  docker run -d -v jenkins_home:/var/jenkins_home -p 8080:8080 -p 50000:50000 --restart=on-failure jenkins/jenkins:lts-jdk17
+  docker run -d -v jenkins_home:/var/jenkins_home -p 8080:8080 -p 50000:50000 --restart=on-failure jenkins/jenkins:lts-jdk21
 - Access Jenkins at http://<your-instance-ip>:8080, configure Jenkins, and install suggested plugins.
 
 ### Step 3: Configure Jenkins Worker Node
