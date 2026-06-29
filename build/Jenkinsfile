@@ -90,8 +90,8 @@ pipeline {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     withCredentials([file(credentialsId: 'ssh-private-key', variable: 'SSH_KEY')]) {
-                        //sh 'touch gfg37ansible.pem'
-                        sh 'cp ${SSH_KEY} ./gfg37ansible.pem && chmod 400 gfg37ansible.pem'
+                        //sh 'touch linux_key.pem'
+                        sh 'cp ${SSH_KEY} ./linux_key.pem && chmod 400 linux_key.pem'
                         sh 'sleep 60' // Wait for instances to be ready
                         sh 'ansible-playbook -i inventory k8s_common.yaml'
                         sh 'ansible-playbook -i inventory k8s_master.yaml'

@@ -1,6 +1,6 @@
 variable "instanceType" {
     type    = string
-    default = "t3.medium"
+    default = "c7i-flex.large"
 }
 
 variable "instance_count" {
@@ -25,12 +25,12 @@ variable "sg_name" {
 
 variable "key_name" {
     type    = string
-    default = "gfg37ansible"
+    default = "linux_key"
 }
 
 variable "public_key_path" {
     type    = string
-    default = "./mykey.pub"
+    default = "./linux_key.pub"
 }
 
 variable "allowedPort" {

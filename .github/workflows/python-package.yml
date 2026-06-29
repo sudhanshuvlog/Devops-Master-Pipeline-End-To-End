@@ -59,4 +59,4 @@ jobs:
           uses: docker/build-push-action@v5
           with:
             push: true
-            tags: jinny1/snakegame:latest
+            tags: vikas546/snakegame:latest
