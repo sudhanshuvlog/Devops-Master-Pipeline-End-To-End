@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: "myos"
-        image: jinny1/snakegame:latest
+        image: vikas546/snakegame:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
