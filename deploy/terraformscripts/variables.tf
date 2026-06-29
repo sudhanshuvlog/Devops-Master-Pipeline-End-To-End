@@ -25,7 +25,7 @@ variable "sg_name" {
 
 variable "key_name" {
     type    = string
-    default = "gfg37ansible"
+    default = "linux_key"
 }
 
 variable "public_key_path" {
