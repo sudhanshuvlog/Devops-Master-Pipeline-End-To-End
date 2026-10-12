@@ -56,14 +56,14 @@
       command: "kubectl get deploy,svc -n {{ namespace }}"
       register: k8s_status
 
-    - name: Show deployment and service status
-      debug:
-        msg: "{{ k8s_status.stdout_lines }}"
+    # - name: Show deployment and service status
+    #   debug:
+    #     msg: "{{ k8s_status.stdout_lines }}"
 
-    - name: Show running pods
-      command: "kubectl get pods -o wide -n {{ namespace }}"
-      register: pods_output
+    # - name: Show running pods
+    #   command: "kubectl get pods -o wide -n {{ namespace }}"
+    #   register: pods_output
 
-    - name: Print pod status
-      debug:
-        msg: "{{ pods_output.stdout_lines }}"
+    # - name: Print pod status
+    #   debug:
+    #     msg: "{{ pods_output.stdout_lines }}"
