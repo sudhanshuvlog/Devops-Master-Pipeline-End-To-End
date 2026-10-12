@@ -1,6 +1,6 @@
 variable "instanceType" {
     type    = string
-    default = "t3.medium"
+    default = "c7i-flex.large"
 }
 
 variable "instance_count" {

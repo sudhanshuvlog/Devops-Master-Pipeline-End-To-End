@@ -116,39 +116,39 @@
       ansible.builtin.command: kubectl -n monitoring expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=3000
       ignore_errors: true
 
-    - name: Ensure prometheus service is present and exposed (NodePort)
-      k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: prometheus-server-ext
-            namespace: monitoring
-          spec:
-            selector:
-              app: prometheus
-            type: NodePort
-            ports:
-              - port: 9090
-                targetPort: 9090
-      register: prometheus_svc
-      failed_when: false
+    # - name: Ensure prometheus service is present and exposed (NodePort)
+    #   k8s:
+    #     state: present
+    #     definition:
+    #       apiVersion: v1
+    #       kind: Service
+    #       metadata:
+    #         name: prometheus-server-ext
+    #         namespace: monitoring
+    #       spec:
+    #         selector:
+    #           app: prometheus
+    #         type: NodePort
+    #         ports:
+    #           - port: 9090
+    #             targetPort: 9090
+    #   register: prometheus_svc
+    #   failed_when: false
 
-    - name: Ensure grafana service exposed (NodePort)
-      k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: grafana-ext
-            namespace: monitoring
-          spec:
-            selector:
-              app.kubernetes.io/name: grafana
-            type: NodePort
-            ports:
-              - port: 3000
-                targetPort: 3000
-      failed_when: false
+    # - name: Ensure grafana service exposed (NodePort)
+    #   k8s:
+    #     state: present
+    #     definition:
+    #       apiVersion: v1
+    #       kind: Service
+    #       metadata:
+    #         name: grafana-ext
+    #         namespace: monitoring
+    #       spec:
+    #         selector:
+    #           app.kubernetes.io/name: grafana
+    #         type: NodePort
+    #         ports:
+    #           - port: 3000
+    #             targetPort: 3000
+    #   failed_when: false
