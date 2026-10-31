@@ -39,13 +39,8 @@
         state: latest
       become: true
       register: kernel_update
-
-    - name: Reboot to use the updated kernel
-      ansible.builtin.reboot:
-        msg: "Rebooting to load the updated kernel"
-        reboot_timeout: 600
-        post_reboot_delay: 15
-      become: true
+      notify: 
+        - Reboot to use the updated kernel
 
     - name: Verify running kernel
       ansible.builtin.command: uname -r
@@ -126,3 +121,12 @@
       loop:
         - crio
         - kubelet
+
+    handlers:
+      - name: Reboot to use the updated kernel
+        ansible.builtin.reboot:
+          msg: "Rebooting to load the updated kernel"
+          reboot_timeout: 600
+          post_reboot_delay: 15
+        become: true
+    
