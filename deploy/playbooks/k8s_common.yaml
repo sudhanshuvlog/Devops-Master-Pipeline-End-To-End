@@ -4,7 +4,7 @@
 
   vars:
     kubernetes_version: "v1.36"
-    crio_version: "v1.32"
+    crio_version: "v1.37"
     pod_cidr: "192.168.0.0/16"
     packages:
       - iproute-tc
@@ -14,7 +14,7 @@
   tasks:
     - name: Disable swap
       command: swapoff -a
-
+      
     - name: Add swapoff to crontab for reboot
       cron:
         name: "Ensure swapoff -a runs at reboot"
@@ -27,6 +27,36 @@
         name: "{{ packages }}"
         state: present
       when: True
+
+    - name: Update kernel packages
+      ansible.builtin.dnf:
+        name:
+          - kernel
+          - kernel-core
+          - kernel-modules
+          - kernel-modules-core
+          - kernel-modules-extra
+        state: latest
+      become: true
+      register: kernel_update
+
+    - name: Reboot to use the updated kernel
+      ansible.builtin.reboot:
+        msg: "Rebooting to load the updated kernel"
+        reboot_timeout: 600
+        post_reboot_delay: 15
+      become: true
+      when: kernel_update.changed
+      #when: True
+
+    - name: Verify running kernel
+      ansible.builtin.command: uname -r
+      register: running_kernel
+      changed_when: false
+
+    - name: Display running kernel
+      ansible.builtin.debug:
+        var: running_kernel.stdout
 
     - name: Load kernel modules
       modprobe:
@@ -68,19 +98,20 @@
           gpgcheck=1
           gpgkey=https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/rpm/repodata/repomd.xml.key
 
-    - name: Install CRI-O repo
-      shell: |
-        curl -L https://pkgs.k8s.io/addons:/cri-o:/stable:/{{ crio_version }}/rpm/repodata/repomd.xml.key | tee /etc/pki/rpm-gpg/RPM-GPG-KEY-crio
-        cat <<EOF >/etc/yum.repos.d/crio.repo
-        [cri-o]
-        name=CRI-O
-        baseurl=https://pkgs.k8s.io/addons:/cri-o:/stable:/{{ crio_version }}/rpm/
-        enabled=1
-        gpgcheck=1
-        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-crio
-        EOF
+    #- name: Install CRI-O repo
+    #  ansible.builtin.yum_repository:
+    #    name: cri-o
+    #    description: CRI-O
+    #    baseurl: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v1.37/rpm/x86_64/"
+    #    enabled: true
+        #gpgcheck: false
+        #gpgkey: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v1.37/rpm/repodata/repomd.xml.key"
+    #    state: present
 
-    - name: Install Kubernetes & CRI-O
+    - command: curl -LO https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v1.37/rpm/x86_64/cri-o-1.37.0-150500.1.1.x86_64.rpm
+    - command: dnf install -y cri-o-1.37.0-150500.1.1.x86_64.rpm
+
+    - name: Install Kubernetes
       dnf:
         name:
           - cri-o
@@ -97,3 +128,4 @@
       loop:
         - crio
         - kubelet
+    

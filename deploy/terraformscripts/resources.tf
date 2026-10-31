@@ -5,7 +5,7 @@ resource "aws_instance" "web" {
   key_name      = var.key_name
   vpc_security_group_ids = [aws_security_group.webserver_sg.id]
   count = var.instance_count
-
+  subnet_id     = aws_subnet.public-subnet.id
   tags = {
     Name = "${var.instanceTagName}-${count.index}"
   }
@@ -20,7 +20,7 @@ resource "aws_instance" "web" {
 resource "aws_security_group" "webserver_sg" {
   name        = var.sg_name
   description = "Webserver Security Group for Kubernetes nodes"
-  vpc_id      = data.aws_vpcs.default_vpc.ids[0]
+  vpc_id = aws_vpc.gfg-vpc.id
 
   # Allow explicit ports only (keeps SSH + k8s ports + nodeport range)
   dynamic "ingress" {

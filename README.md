@@ -25,7 +25,7 @@ My recorded session for this project is uploaded on GeeksForGeeks - https://www.
 - Install Docker on the instance.
 - Configure Jenkins using the following command:
   ```bash
-  docker run -d -v jenkins_home:/var/jenkins_home -p 8080:8080 -p 50000:50000 --restart=on-failure jenkins/jenkins:lts-jdk21
+  docker run -dit --name jenkins -v jenkins_home:/var/jenkins_home -p 8080:8080 -p 50000:50000 --restart=on-failure jenkins/jenkins:lts-jdk25
 - Access Jenkins at http://<your-instance-ip>:8080, configure Jenkins, and install suggested plugins.
 
 ### Step 3: Configure Jenkins Worker Node
@@ -68,10 +68,16 @@ My recorded session for this project is uploaded on GeeksForGeeks - https://www.
 - Visit http://<your-K8sNode-ip>:NodePort to see the deployed webserver.
 - Webserver will be deployed in respective namespace, like dev, qa, prod
 
+## Retrieve Grafana Dashboard Username and password
+- kubectl get secret grafana -n monitoring -o jsonpath='{.data.admin-user}' | base64 --decode
+echo
+- kubectl get secret grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 --decode
+echo
 
 ### Step 12 Create Grafana Dashboard: 
 - Got to Grafana server - http://<your-Prodserver-ip>:3000
 - Add the Prometheus datasource to grafana
+- Grafana Dashboard Id - 15661
 - Visit [View Pre-Created Grafan Dashbords](https://grafana.com/grafana/dashboards/) to select a pre-created dashboard for monitoring the k8s server, you can copy that dashboard ID, and instead of creating the dashboard from scratch we can import a pre-created dashboard.
 - Now you are good to go! Visualize your complete k8s cluster Now!
 

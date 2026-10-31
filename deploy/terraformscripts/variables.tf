@@ -59,3 +59,49 @@ variable "allowedPort" {
         53
     ]
 }
+
+variable "vpc_cidr" {
+  description = "The CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+} 
+
+variable "vpc_name" {
+  description = "The name of the VPC"
+  type        = string
+  default     = "gfg-48-vpc"
+}
+
+variable "public_subnet_cidr" {
+  description = "The CIDR block for the public subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "private_subnet_cidr" {
+  description = "The CIDR block for the private subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+}   
+
+variable "public-subnet-az" {
+  description = "The availability zone for the public subnet"
+  type        = string
+  default     = "ap-south-1a"
+}
+
+variable "private-subnet-az" {
+  description = "The availability zone for the private subnet"
+  type        = string
+  default     = "ap-south-1b"
+}
+
+variable "route_table_allowed_cidr" {
+  description = "The allowed CIDR block for the route table"
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
+
+
+
