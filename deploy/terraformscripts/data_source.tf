@@ -4,7 +4,7 @@ data "aws_ami" "latest_amazon_linux" {
 
   filter {
     name   = "name"
-    values = ["RHEL-9.4.0_HVM-*-x86_64-0-Hourly2-GP3"]
+    values = ["RHEL-10.2.0_HVM_*-x86_64-0-Hourly2-GP3"]
   }
 
   filter {
