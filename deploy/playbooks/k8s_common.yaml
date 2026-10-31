@@ -122,11 +122,11 @@
         - crio
         - kubelet
 
-    handlers:
-      - name: Reboot to use the updated kernel
-        ansible.builtin.reboot:
-          msg: "Rebooting to load the updated kernel"
-          reboot_timeout: 600
-          post_reboot_delay: 15
-        become: true
+  handlers:
+    - name: Reboot to use the updated kernel
+      ansible.builtin.reboot:
+        msg: "Rebooting to load the updated kernel"
+        reboot_timeout: 600
+        post_reboot_delay: 15
+      become: true
     
