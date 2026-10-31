@@ -44,7 +44,7 @@
 
     - name: Extract Helm
       ansible.builtin.unarchive:
-        src: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+        src: /tmp/helm-v4.3.1-linux-amd64.tar.gz
         dest: /tmp/helm
         remote_src: yes
 
