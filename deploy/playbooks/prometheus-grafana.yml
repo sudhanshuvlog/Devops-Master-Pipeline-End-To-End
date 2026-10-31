@@ -21,7 +21,9 @@
 
     - name: Ensure python3-pip is installed (so we can pip-install kubernetes client)
       ansible.builtin.package:
-        name: python3-pip
+        name: 
+          - python3-pip
+          - python3-setuptools
         state: present
 
     - name: Install Python kubernetes client via pip3
