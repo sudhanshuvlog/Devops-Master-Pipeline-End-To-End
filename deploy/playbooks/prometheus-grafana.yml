@@ -34,8 +34,8 @@
 
     - name: Download Helm on remote master
       ansible.builtin.get_url:
-        url: https://get.helm.sh/helm-v3.7.1-linux-amd64.tar.gz
-        dest: /tmp/helm-v3.7.1-linux-amd64.tar.gz
+        url: https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz
+        dest: /tmp/helm-v4.3.1-linux-amd64.tar.gz
 
     - name: Ensure destination directory exists
       ansible.builtin.file:
@@ -118,24 +118,24 @@
       ansible.builtin.command: kubectl -n monitoring expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=3000
       ignore_errors: true
 
-    - name: Ensure prometheus service is present and exposed (NodePort)
-      k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: prometheus-server-ext
-            namespace: monitoring
-          spec:
-            selector:
-              app: prometheus
-            type: NodePort
-            ports:
-              - port: 9090
-                targetPort: 9090
-      register: prometheus_svc
-      failed_when: false
+    # - name: Ensure prometheus service is present and exposed (NodePort)
+    #   k8s:
+    #     state: present
+    #     definition:
+    #       apiVersion: v1
+    #       kind: Service
+    #       metadata:
+    #         name: prometheus-server-ext
+    #         namespace: monitoring
+    #       spec:
+    #         selector:
+    #           app: prometheus
+    #         type: NodePort
+    #         ports:
+    #           - port: 9090
+    #             targetPort: 9090
+    #   register: prometheus_svc
+    #   failed_when: false
 
     - name: Ensure grafana service exposed (NodePort)
       k8s:
