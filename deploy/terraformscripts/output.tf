@@ -1,5 +1,5 @@
 output "ami_info" {
-    value = data.aws_ami.latest_amazon_linux
+    value = data.aws_ami.latest_redhat_linux10
     description = "The AMI data used for instances"
 }
 
