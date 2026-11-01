@@ -1,8 +1,6 @@
 - name: Install Helm and Prometheus
-  hosts: k8s-master  # Run tasks on all hosts
-  become: true  # Run tasks with sudo
-  collections:
-    - community.kubernetes
+  hosts: k8s-master
+  become: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
 
@@ -13,49 +11,53 @@
       ansible.builtin.command: ansible-galaxy collection install community.kubernetes
       changed_when: false
       failed_when: false
-
-    - name: Ensure socat is installed
+    - name: Ensure socat and Python dependencies are installed
       ansible.builtin.package:
-        name: socat
-        state: present
-
-    - name: Ensure python3-pip is installed (so we can pip-install kubernetes client)
-      ansible.builtin.package:
-        name: 
+        name:
+          - socat
           - python3-pip
           - python3-setuptools
         state: present
 
-    - name: Install Python kubernetes client via pip3
-      ansible.builtin.pip:
-        name: kubernetes
-        executable: pip3
-      become: true
+    - name: Check whether Helm is already installed
+      ansible.builtin.command: helm version --short
+      register: helm_check
+      changed_when: false
+      failed_when: false
 
-    - name: Download Helm on remote master
+    - name: Download Helm
       ansible.builtin.get_url:
         url: https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz
         dest: /tmp/helm-v4.3.1-linux-amd64.tar.gz
+      when: helm_check.rc != 0
 
-    - name: Ensure destination directory exists
+    - name: Create Helm extraction directory
       ansible.builtin.file:
         path: /tmp/helm
         state: directory
+      when: helm_check.rc != 0
 
     - name: Extract Helm
       ansible.builtin.unarchive:
         src: /tmp/helm-v4.3.1-linux-amd64.tar.gz
         dest: /tmp/helm
-        remote_src: yes
+        remote_src: true
+      when: helm_check.rc != 0
 
-    - name: Move Helm to /bin
-      ansible.builtin.command: mv /tmp/helm/linux-amd64/helm /bin/helm
-      become: true
+    - name: Install Helm binary
+      ansible.builtin.copy:
+        src: /tmp/helm/linux-amd64/helm
+        dest: /usr/local/bin/helm
+        remote_src: true
+        mode: '0755'
+      when: helm_check.rc != 0
 
-    - name: Check Helm version
-      ansible.builtin.command: helm version
+    - name: Install Python Kubernetes client
+      ansible.builtin.pip:
+        name: kubernetes
+        executable: pip3
 
-    - name: Copy the k8s pv files to target node
+    - name: Copy Kubernetes PV manifests
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: "/{{ item | basename }}"
@@ -64,55 +66,66 @@
         - ../prometheus-server1pv.yml
         - ../prometheus-serverpv.yml
 
-    - name: Create namespace monitoring
+    - name: Ensure monitoring namespace exists
       ansible.builtin.command: kubectl create namespace monitoring
-      ignore_errors: true
+      register: namespace_result
+      changed_when: namespace_result.rc == 0
+      failed_when:
+        - namespace_result.rc != 0
+        - "'AlreadyExists' not in namespace_result.stderr"
 
-
-    - name: Make the deployments with kubectl
+    - name: Apply PV manifests
       ansible.builtin.command: "kubectl apply -f {{ item }}"
       loop:
-        - permissions-pv.yml
-        - prometheus-server1pv.yml
-        - prometheus-serverpv.yml
-      args:
-        chdir: /
+        - /permissions-pv.yml
+        - /prometheus-server1pv.yml
+        - /prometheus-serverpv.yml
+      register: pv_result
+      changed_when: "'unchanged' not in pv_result.stdout"
 
     - name: Add Prometheus Helm repository
-      ansible.builtin.command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      ansible.builtin.command: >
+        helm repo add prometheus-community
+        https://prometheus-community.github.io/helm-charts
+      register: prometheus_repo
+      changed_when: prometheus_repo.rc == 0
+      failed_when: false
+
+    - name: Add Grafana Helm repository
+      ansible.builtin.command: >
+        helm repo add grafana
+        https://grafana.github.io/helm-charts
+      register: grafana_repo
+      changed_when: grafana_repo.rc == 0
+      failed_when: false
 
     - name: Update Helm repositories
       ansible.builtin.command: helm repo update
+      changed_when: false
 
-    - name: Install or upgrade Prometheus using Helm (non-blocking, retry on concurrent ops)
-      ansible.builtin.command: >-
-        helm upgrade --install prometheus prometheus-community/prometheus
-        --namespace monitoring --create-namespace
-      register: prometheus_release
-      retries: 8
-      delay: 10
-      until: prometheus_release.rc == 0
+    - name: Check whether Prometheus is already installed
+      ansible.builtin.command: helm status prometheus -n monitoring
+      register: prometheus_status
+      changed_when: false
+      failed_when: false
 
-    - name: Expose Prometheus service using kubectl in monitoring namespace
-      ansible.builtin.command: kubectl -n monitoring expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext --port=9090
-      ignore_errors: true
+    - name: Install Prometheus on first run
+      ansible.builtin.command: >
+        helm install prometheus prometheus-community/prometheus
+        --namespace monitoring
+      when: prometheus_status.rc != 0
 
-    - name: Update Helm repositories for Grafana
-      ansible.builtin.command: helm repo update
-      ignore_errors: yes
+    - name: Check whether Grafana is already installed
+      ansible.builtin.command: helm status grafana -n monitoring
+      register: grafana_status
+      changed_when: false
+      failed_when: false
 
-    - name: Add Helm repo for Grafana
-      ansible.builtin.command: helm repo add grafana https://grafana.github.io/helm-charts
-      ignore_errors: yes
-
-    - name: Install or upgrade Grafana using Helm (non-blocking, retry on concurrent ops)
-      ansible.builtin.command: >-
-        helm upgrade --install grafana grafana/grafana
-        --namespace monitoring --create-namespace
-      register: grafana_release
-      retries: 8
-      delay: 10
-      until: grafana_release.rc == 0
+    - name: Install Grafana on first run
+      ansible.builtin.command: >
+        helm install grafana grafana/grafana
+        --namespace monitoring
+      when: grafana_status.rc != 0
 
     - name: Expose Grafana service using kubectl in monitoring namespace
       ansible.builtin.command: kubectl -n monitoring expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext --port=3000
