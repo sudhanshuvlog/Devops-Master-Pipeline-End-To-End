@@ -1,6 +1,6 @@
 resource "aws_instance" "web" {
   depends_on = [aws_security_group.webserver_sg]
-  ami           = data.aws_ami.latest_amazon_linux.id
+  ami           = data.aws_ami.latest_redhat_linux10.id
   instance_type = var.instanceType
   key_name      = var.key_name
   vpc_security_group_ids = [aws_security_group.webserver_sg.id]
